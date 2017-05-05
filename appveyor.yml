@@ -1,0 +1,56 @@
+version: 5.1.{build}
+os: Visual Studio 2017
+clone_depth: 2
+configuration: Release
+
+pull_requests:
+  do_not_increment_build_number: true
+
+init:
+  - git config --global core.autocrlf input
+  - ps: $env:GIT_HASH=$env:APPVEYOR_REPO_COMMIT.Substring(0, 10)
+  - ps: If ("$env:APPVEYOR_REPO_TAG" -ne "true") { $env:VERSION_SUFFIX="pre" }
+  - ps: 'Write-Output "Version: $($env:APPVEYOR_BUILD_VERSION)-$($env:VERSION_SUFFIX)"'
+
+before_build:
+  - ps: .\build\Set-BuildVersion -Version $env:APPVEYOR_BUILD_VERSION -Suffix $env:VERSION_SUFFIX
+  - nuget sources add -name Exceptionless -source https://www.myget.org/F/exceptionless/api/v3/index.json
+  - appveyor-retry dotnet restore -v Minimal
+
+build_script:
+  - ps: dotnet build -c Release
+
+#on_failure:
+#  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+
+before_test:
+  - nuget install redis-64 -excludeversion
+  - redis-64\tools\redis-server.exe --service-install
+  - redis-64\tools\redis-server.exe --service-start
+
+after_test:
+  - ps: dotnet pack -c Release
+
+artifacts:
+  - path: artifacts\*.nupkg
+    name: NuGet
+
+deploy:
+  - provider: Environment
+    name: MyGet
+  - provider: Environment
+    name: NuGet
+    on:
+      appveyor_repo_tag: true
+  - provider: GitHub
+    auth_token:
+      secure: 0s81q7bweVLTFSOKxnIhan7el6bIFiN8HJ1kYJzOkeFXX7wgGSq9bs/rV53X9qpf
+    draft: true
+    on:
+      appveyor_repo_tag: true
+
+notifications:
+  - provider: Slack
+    auth_token:
+      secure: GniMpFE62HprSyQNQoej/fBOAdbQe8EMWAMMNXX0s2JxeNePjemiO1bCf4eYweE4p70mm0sCwMjeEP/Ps9aTMA==
+    channel: '#notifications'
