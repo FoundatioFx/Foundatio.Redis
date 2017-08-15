@@ -16,11 +16,9 @@ before_build:
   - ps: .\build\Set-BuildVersion -Version $env:APPVEYOR_BUILD_VERSION -Suffix $env:VERSION_SUFFIX
   - nuget sources add -name Exceptionless -source https://www.myget.org/F/exceptionless/api/v3/index.json
   - appveyor-retry dotnet restore -v Minimal
-  - appveyor-retry dotnet restore .\src\Foundatio.Redis.Signed -v Minimal
 
 build_script:
   - ps: dotnet build -c Release
-  - ps: dotnet build .\src\Foundatio.Redis.Signed -c Release
 
 #on_failure:
 #  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
@@ -32,7 +30,6 @@ before_test:
 
 after_test:
   - ps: dotnet pack -c Release
-  - ps: dotnet pack .\src\Foundatio.Redis.Signed -o ../../artifacts -c Release
 
 artifacts:
   - path: artifacts\*.nupkg
