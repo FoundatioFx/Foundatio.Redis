@@ -32,6 +32,9 @@ before_test:
   - redis-64\tools\redis-server.exe --service-install
   - redis-64\tools\redis-server.exe --service-start
 
+test_script:
+  - ps: dotnet test .\test\Foundatio.Redis.Tests\Foundatio.Redis.Tests.csproj -f netcoreapp2.0
+
 after_test:
   - ps: dotnet pack -c Release
 
