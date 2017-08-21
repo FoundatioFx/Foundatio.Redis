@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26403.7
+VisualStudioVersion = 15.0.26730.3
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{70515E66-DAF8-4D18-8F8F-8A2934171AA9}"
 EndProject
@@ -12,7 +12,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		build\common.props = build\common.props
 		README.md = README.md
 		build\sourcelink.props = build\sourcelink.props
-		build\test.props = build\test.props
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Redis", "src\Foundatio.Redis\Foundatio.Redis.csproj", "{EAE3607D-73A1-4D02-BDAA-24A37DDA15CB}"
@@ -106,5 +105,8 @@ Global
 		{5C3AE887-C3CB-40E5-B1F5-6B7E802FFEC8} = {4627517A-487E-4B03-AE39-BE8C057EB2F9}
 		{B26F0F47-9747-4C90-898D-CEB2B0406B4C} = {4627517A-487E-4B03-AE39-BE8C057EB2F9}
 		{1EEB4A18-5046-4F41-B021-C31C9E418F86} = {70515E66-DAF8-4D18-8F8F-8A2934171AA9}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {ED76C45B-CAC0-42B7-B2F2-DFEB046E87B9}
 	EndGlobalSection
 EndGlobal
