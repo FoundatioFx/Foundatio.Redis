@@ -24,7 +24,7 @@
     <PackageOutputPath>$(SolutionDir)artifacts</PackageOutputPath>
 
     <PackageReleaseNotes>https://github.com/FoundatioFx/Foundatio.Redis/releases</PackageReleaseNotes>
-    <PackageIconUrl>https://raw.githubusercontent.com/FoundatioFx/Foundatio.Redis/master/media/foundatio-icon.png</PackageIconUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/FoundatioFx/Foundatio/master/media/foundatio-icon.png</PackageIconUrl>
     <PackageProjectUrl>https://github.com/FoundatioFx/Foundatio.Redis</PackageProjectUrl>
     <PackageLicenseUrl>http://www.apache.org/licenses/LICENSE-2.0</PackageLicenseUrl>
     <RepositoryType>git</RepositoryType>
