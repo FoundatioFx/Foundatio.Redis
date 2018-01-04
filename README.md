@@ -3,6 +3,7 @@
 [![Build status](https://ci.appveyor.com/api/projects/status/dyaa7xd7a3m0q82r?svg=true)](https://ci.appveyor.com/project/Exceptionless/foundatio-redis)
 [![NuGet Version](http://img.shields.io/nuget/v/Foundatio.Redis.svg?style=flat)](https://www.nuget.org/packages/Foundatio.Redis/)
 [![Slack Status](https://slack.exceptionless.com/badge.svg)](https://slack.exceptionless.com)
+[![Help Contribute to Open Source](https://www.codetriage.com/foundatiofx/foundatio.redis/badges/users.svg)](https://www.codetriage.com/foundatiofx/foundatio.redis)
 
 Pluggable foundation blocks for building loosely coupled distributed apps.
 - [Caching](#caching)
