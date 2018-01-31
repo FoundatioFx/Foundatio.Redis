@@ -16,6 +16,16 @@
           "problemMatcher": "$msCompile"
       },
       {
+        "label": "benchmark",
+        "command": "dotnet",
+        "type": "process",
+        "args": [
+            "build",
+            "${workspaceFolder}/test/Foundatio.Benchmarks/Foundatio.Benchmarks.csproj"
+          ],
+        "problemMatcher": "$msCompile"
+    },
+    {
         "label": "test",
         "command": "dotnet",
         "type": "process",
