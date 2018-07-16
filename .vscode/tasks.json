@@ -11,17 +11,43 @@
           },
           "args": [
               "build",
-              "${workspaceFolder}/test/Foundatio.Redis.Tests/Foundatio.Redis.Tests.csproj"
+              "${workspaceFolder}/test/Foundatio.Redis.Tests/Foundatio.Redis.Tests.csproj",
+              "/p:GenerateFullPaths=true"
             ],
           "problemMatcher": "$msCompile"
       },
       {
+        "label": "build sample job",
+        "command": "dotnet",
+        "type": "process",
+        "group": "build",
+        "args": [
+            "build",
+            "${workspaceFolder}/samples/Foundatio.SampleJob/Foundatio.SampleJob.csproj",
+            "/p:GenerateFullPaths=true"
+          ],
+        "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build sample client",
+      "command": "dotnet",
+      "type": "process",
+      "group": "build",
+      "args": [
+          "build",
+          "${workspaceFolder}/samples/Foundatio.SampleJobClient/Foundatio.SampleJobClient.csproj",
+          "/p:GenerateFullPaths=true"
+        ],
+      "problemMatcher": "$msCompile"
+  },
+  {
         "label": "benchmark",
         "command": "dotnet",
         "type": "process",
         "args": [
             "build",
-            "${workspaceFolder}/test/Foundatio.Benchmarks/Foundatio.Benchmarks.csproj"
+            "${workspaceFolder}/test/Foundatio.Benchmarks/Foundatio.Benchmarks.csproj",
+            "/p:GenerateFullPaths=true"
           ],
         "problemMatcher": "$msCompile"
     },
@@ -35,7 +61,8 @@
         },
         "args": [
             "test",
-            "${workspaceFolder}/test/Foundatio.Redis.Tests/Foundatio.Redis.Tests.csproj"
+            "${workspaceFolder}/test/Foundatio.Redis.Tests/Foundatio.Redis.Tests.csproj",
+            "/p:GenerateFullPaths=true"
         ],
         "problemMatcher": "$msCompile"
     }

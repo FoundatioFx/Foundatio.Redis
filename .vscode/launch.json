@@ -1,28 +1,54 @@
 {
-   // Use IntelliSense to find out which attributes exist for C# debugging
-   // Use hover for the description of the existing attributes
-   // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
-   "version": "0.2.0",
-   "configurations": [
-        {
-            "name": ".NET Core Launch (console)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "build",
-            // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/test/Foundatio.Benchmarks/bin/Debug/netcoreapp2.0/Foundatio.Benchmarks.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/test/Foundatio.Benchmarks",
-            // For more information about the 'console' field, see https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md#console-terminal-window
-            "console": "internalConsole",
-            "stopAtEntry": false,
-            "internalConsoleOptions": "openOnSessionStart"
-        },
-        {
-            "name": ".NET Core Attach",
-            "type": "coreclr",
-            "request": "attach",
-            "processId": "${command:pickProcess}"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Sample Job",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build sample job",
+      "program": "${workspaceFolder}/samples/Foundatio.SampleJob/bin/Debug/netcoreapp2.0/Foundatio.SampleJob.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/samples/Foundatio.SampleJob",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      "name": "Sample Client",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build sample client",
+      "program": "${workspaceFolder}/samples/Foundatio.SampleJobClient/bin/Debug/netcoreapp2.0/Foundatio.SampleJobClient.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/samples/Foundatio.SampleJobClient",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      "name": "Benchmarks",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/test/Foundatio.Benchmarks/bin/Debug/netcoreapp2.0/Foundatio.Benchmarks.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/test/Foundatio.Benchmarks",
+      "console": "internalConsole",
+      "stopAtEntry": false,
+      "internalConsoleOptions": "openOnSessionStart"
+    },
+    {
+      "name": ".NET Core Attach",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickProcess}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Sample",
+      "configurations": [
+        "Sample Job",
+        "Sample Client"
+      ]
+    }
+  ]
 }
