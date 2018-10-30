@@ -17,6 +17,7 @@ init:
     fi
 
 build_script:
+  - sudo apt install docker-compose
   - docker-compose up -d # starts redis
   - docker build --target testrunner -t foundatio:test --build-arg build=${BUILD_NUMBER} .
   - docker run -e APPVEYOR_API_URL --net=host -v $(pwd)/artifacts:/app/artifacts foundatio:test
