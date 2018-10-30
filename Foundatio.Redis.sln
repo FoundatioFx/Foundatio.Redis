@@ -16,7 +16,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Redis", "src\Foundatio.Redis\Foundatio.Redis.csproj", "{EAE3607D-73A1-4D02-BDAA-24A37DDA15CB}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Redis.Tests", "test\Foundatio.Redis.Tests\Foundatio.Redis.Tests.csproj", "{9832E1F4-C826-4704-890A-00F330BC5913}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Redis.Tests", "tests\Foundatio.Redis.Tests\Foundatio.Redis.Tests.csproj", "{9832E1F4-C826-4704-890A-00F330BC5913}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Samples", "Samples", "{4627517A-487E-4B03-AE39-BE8C057EB2F9}"
 EndProject
@@ -24,7 +24,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.SampleJob", "samp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.SampleJobClient", "samples\Foundatio.SampleJobClient\Foundatio.SampleJobClient.csproj", "{B26F0F47-9747-4C90-898D-CEB2B0406B4C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Benchmarks", "test\Foundatio.Benchmarks\Foundatio.Benchmarks.csproj", "{1EEB4A18-5046-4F41-B021-C31C9E418F86}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Foundatio.Benchmarks", "tests\Foundatio.Benchmarks\Foundatio.Benchmarks.csproj", "{1EEB4A18-5046-4F41-B021-C31C9E418F86}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
