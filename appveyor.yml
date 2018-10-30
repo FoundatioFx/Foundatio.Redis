@@ -17,7 +17,7 @@ init:
     fi
 
 build_script:
-  - docker run -d -m 2g -p 7000-7006:7000-7006 -e IP=0.0.0.0 -e STANDALONE=true grokzen/redis-cluster:4.0.11 # starts redis
+  - docker run -d -m 2g -p 7000-7006:7000-7006 -e IP=0.0.0.0 -e STANDALONE=true grokzen/redis-cluster:4.0.11
   - docker build --target testrunner -t foundatio:test --build-arg build=${BUILD_NUMBER} .
   - docker run -e APPVEYOR_API_URL --net=host -v $(pwd)/artifacts:/app/artifacts foundatio:test
 

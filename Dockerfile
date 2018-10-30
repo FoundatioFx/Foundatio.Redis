@@ -48,6 +48,7 @@ WORKDIR /app/
 ENTRYPOINT [ "dotnet", "nuget", "push", "/app/artifacts/*.nupkg" ]
 
 # docker build --target testrunner -t foundatio:testrunner --build-arg build=123-dev .
+# docker run -it -m 2g -p 7000-7006:7000-7006 -e IP=0.0.0.0 -e STANDALONE=true grokzen/redis-cluster:4.0.11
 # docker run -it -v $(pwd)/artifacts:/app/artifacts foundatio:testrunner
 
 # docker build --target publish -t foundatio:publish --build-arg build=123-dev .
