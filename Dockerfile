@@ -27,7 +27,7 @@ RUN dotnet build --version-suffix $build -c Release
 # testrunner
 
 FROM build AS testrunner
-WORKDIR /app/tests/Foundatio.Tests
+WORKDIR /app/tests/Foundatio.Redis.Tests
 ENTRYPOINT dotnet test --results-directory /app/artifacts --logger:trx
 
 # pack
