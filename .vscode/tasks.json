@@ -81,7 +81,7 @@
     },
     {
       "label": "docker: test",
-      "command": "docker build --target testrunner -t foundatio:test . && docker run -v $(pwd)/artifacts:/app/artifacts foundatio:test",
+      "command": "docker build --target testrunner -t foundatio:test . && docker run -it --net host -v $(pwd)/artifacts:/app/artifacts foundatio:test",
       "type": "shell",
       "group": "build",
       "problemMatcher": "$msCompile"
