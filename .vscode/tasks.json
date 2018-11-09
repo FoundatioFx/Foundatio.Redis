@@ -11,7 +11,7 @@
       },
       "args": [
         "build",
-        "${workspaceFolder}/tests/Foundatio.Redis.Tests/Foundatio.Redis.Tests.csproj",
+        "${workspaceFolder}",
         "/p:GenerateFullPaths=true"
       ],
       "problemMatcher": "$msCompile"
