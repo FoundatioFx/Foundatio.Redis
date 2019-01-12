@@ -6,6 +6,7 @@
 [Bb]in/
 [Oo]bj/
 artifacts
+.vs/
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
@@ -49,3 +50,4 @@ _NCrunch_*
 **/.idea/**/*.iml
 **/.idea/**/contentModel.xml
 **/.idea/**/modules.xml
+
