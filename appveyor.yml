@@ -29,7 +29,7 @@ before_build:
 
 build_script:
   - docker build --target testrunner -t foundatio:test --build-arg VERSION_SUFFIX=${VERSION_SUFFIX} .
-  - docker run -d -m 2g -p 7000-7006:7000-7006 -e IP=0.0.0.0 -e STANDALONE=true grokzen/redis-cluster:4.0.11
+  - docker run -d -m 2g -p 7000-7006:7000-7006 -e IP=0.0.0.0 -e STANDALONE=true grokzen/redis-cluster:5.0.4
   - docker run -e APPVEYOR_API_URL --net=host -v $(pwd)/artifacts:/app/artifacts foundatio:test
 
 after_build:
