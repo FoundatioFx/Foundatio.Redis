@@ -23,7 +23,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageOutputPath>$(SolutionDir)artifacts</PackageOutputPath>
     <PackageIconUrl>https://raw.githubusercontent.com/FoundatioFx/Foundatio/master/media/foundatio-icon.png</PackageIconUrl>
-    <PackageLicenseUrl>http://www.apache.org/licenses/LICENSE-2.0</PackageLicenseUrl>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
     <RepositoryUrl>$(PackageProjectUrl)</RepositoryUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
@@ -38,6 +38,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0-beta2-18618-05" PrivateAssets="All"/>
     <PackageReference Include="AsyncFixer" Version="1.1.6" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../LICENSE.txt" Pack="true" Visible="false" PackagePath="$(PackageLicenseFile)" />
   </ItemGroup>
 
 </Project>
