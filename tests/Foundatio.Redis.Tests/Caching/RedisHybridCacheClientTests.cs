@@ -15,7 +15,7 @@ namespace Foundatio.Redis.Tests.Caching {
         }
 
         protected override ICacheClient GetCacheClient() {
-            return new RedisHybridCacheClient(o => o.ConnectionMultiplexer(SharedConnection.GetMuxer()).LoggerFactory(Log));
+            return new RedisHybridCacheClient(o => o.ConnectionMultiplexer(SharedConnection.GetMuxer()).LoggerFactory(Log), localConfig => localConfig.CloneValues(true));
         }
 
         [Fact]
@@ -49,8 +49,8 @@ namespace Foundatio.Redis.Tests.Caching {
         }
         
         [Fact]
-        public override Task CanManageSetsAsync() {
-            return base.CanManageSetsAsync();
+        public override Task CanManageListsAsync() {
+            return base.CanManageListsAsync();
         }
 
         [Fact]
