@@ -17,41 +17,6 @@
       "problemMatcher": "$msCompile"
     },
     {
-      "label": "build sample job",
-      "command": "dotnet",
-      "type": "process",
-      "group": "build",
-      "args": [
-        "build",
-        "${workspaceFolder}/samples/Foundatio.SampleJob/Foundatio.SampleJob.csproj",
-        "/p:GenerateFullPaths=true"
-      ],
-      "problemMatcher": "$msCompile"
-    },
-    {
-      "label": "build sample client",
-      "command": "dotnet",
-      "type": "process",
-      "group": "build",
-      "args": [
-        "build",
-        "${workspaceFolder}/samples/Foundatio.SampleJobClient/Foundatio.SampleJobClient.csproj",
-        "/p:GenerateFullPaths=true"
-      ],
-      "problemMatcher": "$msCompile"
-    },
-    {
-      "label": "benchmark",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/tests/Foundatio.Benchmarks/Foundatio.Benchmarks.csproj",
-        "/p:GenerateFullPaths=true"
-      ],
-      "problemMatcher": "$msCompile"
-    },
-    {
       "label": "test",
       "command": "dotnet",
       "type": "process",
@@ -61,7 +26,7 @@
       },
       "args": [
         "test",
-        "${workspaceFolder}/tests/Foundatio.Redis.Tests/Foundatio.Redis.Tests.csproj",
+        "${workspaceFolder}",
         "/p:GenerateFullPaths=true"
       ],
       "problemMatcher": "$msCompile"
@@ -71,20 +36,6 @@
       "command": "dotnet pack -c Release -o ${workspaceFolder}/artifacts",
       "type": "shell",
       "problemMatcher": []
-    },
-    {
-      "label": "docker: build",
-      "command": "docker build --target build -t foundatio:build . && docker run -v $(pwd)/artifacts:/app/artifacts foundatio:build",
-      "type": "shell",
-      "group": "build",
-      "problemMatcher": "$msCompile"
-    },
-    {
-      "label": "docker: test",
-      "command": "docker build --target testrunner -t foundatio:test . && docker run -it --net host -v $(pwd)/artifacts:/app/artifacts foundatio:test",
-      "type": "shell",
-      "group": "build",
-      "problemMatcher": "$msCompile"
     },
     {
       "label": "docker: redis",
