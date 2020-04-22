@@ -9,6 +9,7 @@
     <PackageTags>Queue;Messaging;Message;Bus;ServiceBus;Locking;Lock;Distributed;File;Storage;Blob;Jobs;Metrics;Stats;Azure;Redis;StatsD;Amazon;AWS;S3;broker;Logging;Log</PackageTags>
     <MinVerSkip Condition="'$(Configuration)' == 'Debug'">true</MinVerSkip>
     <MinVerTagPrefix>v</MinVerTagPrefix>
+    <ReferenceFoundatioSource Condition="$(SolutionName.Contains('All'))">true</ReferenceFoundatioSource>
 
     <Copyright>Copyright (c) 2020 Foundatio.  All rights reserved.</Copyright>
     <Authors>FoundatioFx</Authors>
