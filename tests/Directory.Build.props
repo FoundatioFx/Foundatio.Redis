@@ -6,12 +6,13 @@
     <NoWarn>$(NoWarn);CS1591;NU1701</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.5.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.6.1" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.1" />
-    <ProjectReference Include="..\..\..\Foundatio\src\Foundatio.TestHarness\Foundatio.TestHarness.csproj" Condition="'$(ReferenceFoundatioSource)' == 'true'" />
-    <PackageReference Include="Foundatio.TestHarness" Version="9.0.0" Condition="'$(ReferenceFoundatioSource)' == '' OR '$(ReferenceFoundatioSource)' == 'false'" />
     <PackageReference Include="xRetry" Version="0.5.0" />
+    <PackageReference Include="Foundatio.TestHarness" Version="9.0.0" Condition="'$(ReferenceFoundatioSource)' == '' OR '$(ReferenceFoundatioSource)' == 'false'" />
+
+    <ProjectReference Include="..\..\..\Foundatio\src\Foundatio.TestHarness\Foundatio.TestHarness.csproj" Condition="'$(ReferenceFoundatioSource)' == 'true'" />
   </ItemGroup>
   <ItemGroup>
     <None Update="appsettings.json">
