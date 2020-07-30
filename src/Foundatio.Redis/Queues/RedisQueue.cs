@@ -31,6 +31,7 @@ namespace Foundatio.Queues {
         private Task _maintenanceTask;
         private bool _isSubscribed;
         private readonly TimeSpan _payloadTimeToLive;
+        private readonly TimeSpan _retryDelay;
         private bool _scriptsLoaded;
 
         private LoadedLuaScript _dequeueId;
@@ -43,6 +44,7 @@ namespace Foundatio.Queues {
             _cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = options.ConnectionMultiplexer, Serializer = _serializer });
 
             _payloadTimeToLive = GetPayloadTtl();
+            _retryDelay = options.RetryDelay;
             _subscriber = _options.ConnectionMultiplexer.GetSubscriber();
 
             string listPrefix = _options.ConnectionMultiplexer.IsCluster() ? "{q:" + _options.Name + "}" : $"q:{_options.Name}";
@@ -55,8 +57,7 @@ namespace Foundatio.Queues {
             var interval = _options.WorkItemTimeout > TimeSpan.FromSeconds(1) ? _options.WorkItemTimeout.Min(TimeSpan.FromMinutes(1)) : TimeSpan.FromSeconds(1);
             _maintenanceLockProvider = new ThrottlingLockProvider(_cache, 1, interval);
 
-            if (_logger.IsEnabled(LogLevel.Trace))
-                _logger.LogTrace("Queue {QueueId} created. Retries: {Retries} Retry Delay: {RetryDelay:g}, Maintenance Interval: {MaintenanceInterval:g}", QueueId, _options.Retries, _options.RetryDelay, interval);
+            _logger.LogInformation("Queue {QueueId} created. Retries: {Retries} Retry Delay: {RetryDelay:g}, Maintenance Interval: {MaintenanceInterval:g}", QueueId, _options.Retries, _retryDelay, interval);
         }
 
         public RedisQueue(Builder<RedisQueueOptionsBuilder<T>, RedisQueueOptions<T>> config)
@@ -320,52 +321,37 @@ namespace Foundatio.Queues {
         private async Task<RedisValue> DequeueIdAsync(CancellationToken linkedCancellationToken) {
             try {
                 return await Run.WithRetriesAsync(async () => {
-                    var wiTimeoutTtl = GetWorkItemTimeoutTimeTtl();
+                    var timeout = GetWorkItemTimeoutTimeTtl();
                     long now = SystemClock.UtcNow.Ticks;
 
-                    // we must move the item between the in and work queues and set the dequeued & renewed keys in transaction to avoid situations where 
-                    // we have item in the work queue without the keys which will prevent maintainance from handling it
-                    // we can't use transaction as we need to use the result of ListRightPopLeftPushAsync to generate the keys
                     await LoadScriptsAsync().AnyContext();
-                    var result = await Database.ScriptEvaluateAsync(_dequeueId, new { queueListName = _queueListName, workListName = _workListName, queueName = _options.Name, now, wiTimeoutTtl = wiTimeoutTtl.Ticks }).AnyContext();
+                    var result = await Database.ScriptEvaluateAsync(_dequeueId, new {
+                        queueListName = _queueListName,
+                        workListName = _workListName,
+                        queueName = _options.Name,
+                        now,
+                        timeout = timeout.Ticks
+                    }).AnyContext();
                     return result.ToString();
-                    } , 3, TimeSpan.FromMilliseconds(100), linkedCancellationToken, _logger).AnyContext();                
+                }, 3, TimeSpan.FromMilliseconds(100), linkedCancellationToken, _logger).AnyContext();                
             } catch (Exception ex) {                
                 if (_logger.IsEnabled(LogLevel.Error)) _logger.LogError("Queue {Name} dequeue id async error: {Error}", _options.Name, ex);
                 return RedisValue.Null;
             }
         }
 
-        private async Task LoadScriptsAsync() {
-            if (_scriptsLoaded)
-                return;
-
-            using (await _lock.LockAsync().AnyContext()) {
-                if (_scriptsLoaded)
-                    return;
-
-                var dequeueId = LuaScript.Prepare(DequeueIdScript);
-
-                foreach (var endpoint in _options.ConnectionMultiplexer.GetEndPoints()) {
-                    var server = _options.ConnectionMultiplexer.GetServer(endpoint);
-                    if (server.IsReplica)
-                        continue;
-
-                    _dequeueId = await dequeueId.LoadAsync(server).AnyContext();
-                }
-
-                _scriptsLoaded = true;
-            }
-        }
-
         public override async Task CompleteAsync(IQueueEntry<T> entry) {
             if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Queue {Name} complete item: {EntryId}", _options.Name, entry.Id);
-            if (entry.IsAbandoned || entry.IsCompleted)
+            if (entry.IsAbandoned || entry.IsCompleted) {
+                //_logger.LogDebug("Queue {Name} item already abandoned or completed: {EntryId}", _options.Name, entry.Id);
                 throw new InvalidOperationException("Queue entry has already been completed or abandoned.");
+            }
 
             long result = await Run.WithRetriesAsync(() => Database.ListRemoveAsync(_workListName, entry.Id), logger: _logger).AnyContext();
-            if (result == 0)
+            if (result == 0) {
+                _logger.LogDebug("Queue {Name} item not in work list: {EntryId}", _options.Name, entry.Id);
                 throw new InvalidOperationException("Queue entry not in work list, it may have been auto abandoned.");
+            }
 
             await Run.WithRetriesAsync(() => Task.WhenAll(
                 Database.KeyDeleteAsync(GetPayloadKey(entry.Id)),
@@ -383,9 +369,11 @@ namespace Foundatio.Queues {
         }
 
         public override async Task AbandonAsync(IQueueEntry<T> entry) {
-            if (_logger.IsEnabled(LogLevel.Debug)) _logger.LogDebug("Queue {Name}:{QueueId} abandon item: {EntryId}", _options.Name, QueueId, entry.Id);
-            if (entry.IsAbandoned || entry.IsCompleted)
+            _logger.LogDebug("Queue {Name}:{QueueId} abandon item: {EntryId}", _options.Name, QueueId, entry.Id);
+            if (entry.IsAbandoned || entry.IsCompleted) {
+                _logger.LogError("Queue {Name}:{QueueId} unable to abandon item because already abandoned or completed: {EntryId}", _options.Name, QueueId, entry.Id);
                 throw new InvalidOperationException("Queue entry has already been completed or abandoned.");
+            }
 
             string attemptsCacheKey = GetAttemptsKey(entry.Id);
             var attemptsCachedValue = await Run.WithRetriesAsync(() => _cache.GetAsync<int>(attemptsCacheKey), logger: _logger).AnyContext();
@@ -393,13 +381,11 @@ namespace Foundatio.Queues {
             if (attemptsCachedValue.HasValue)
                 attempts = attemptsCachedValue.Value + 1;
 
-            bool isTraceLogLevelEnabled = _logger.IsEnabled(LogLevel.Trace);
             var retryDelay = GetRetryDelay(attempts);
-            if (isTraceLogLevelEnabled)
-                _logger.LogTrace("Item: {EntryId}, Retry attempts: {RetryAttempts}, Retries Allowed: {Retries}, Retry Delay: {RetryDelay:g}", entry.Id, attempts - 1, _options.Retries, retryDelay);
+            _logger.LogInformation("Item: {EntryId}, Retry attempts: {RetryAttempts}, Retries Allowed: {Retries}, Retry Delay: {RetryDelay:g}", entry.Id, attempts - 1, _options.Retries, retryDelay);
 
             if (attempts > _options.Retries) {
-                if (isTraceLogLevelEnabled) _logger.LogTrace("Exceeded retry limit moving to deadletter: {EntryId}", entry.Id);
+                _logger.LogInformation("Exceeded retry limit moving to deadletter: {EntryId}", entry.Id);
 
                 var tx = Database.CreateTransaction();
                 tx.AddCondition(Condition.KeyExists(GetRenewedTimeKey(entry.Id)));
@@ -417,7 +403,7 @@ namespace Foundatio.Queues {
                     Database.KeyDeleteAsync(GetWaitTimeKey(entry.Id))
                 ), logger: _logger).AnyContext();
             } else if (retryDelay > TimeSpan.Zero) {
-                if (isTraceLogLevelEnabled) _logger.LogTrace("Adding item to wait list for future retry: {EntryId}", entry.Id);
+                _logger.LogInformation("Adding item to wait list for future retry: {EntryId}", entry.Id);
 
                 await Run.WithRetriesAsync(() => Task.WhenAll(
                     _cache.SetAsync(GetWaitTimeKey(entry.Id), SystemClock.UtcNow.Add(retryDelay).Ticks, GetWaitTimeTtl()),
@@ -435,7 +421,7 @@ namespace Foundatio.Queues {
 
                 await Run.WithRetriesAsync(() => Database.KeyDeleteAsync(GetDequeuedTimeKey(entry.Id)), logger: _logger).AnyContext();
             } else {
-                if (isTraceLogLevelEnabled) _logger.LogTrace("Adding item back to queue for retry: {EntryId}", entry.Id);
+                _logger.LogInformation("Adding item back to queue for retry: {EntryId}", entry.Id);
                 
                 await Run.WithRetriesAsync(() => _cache.IncrementAsync(attemptsCacheKey, 1, GetAttemptsTtl()), logger: _logger).AnyContext();
 
@@ -458,16 +444,18 @@ namespace Foundatio.Queues {
             Interlocked.Increment(ref _abandonedCount);
             entry.MarkAbandoned();
             await OnAbandonedAsync(entry).AnyContext();
-            if (isTraceLogLevelEnabled) _logger.LogTrace("Abandon complete: {EntryId}", entry.Id);
+            _logger.LogInformation("Abandon complete: {EntryId}", entry.Id);
         }
 
         private TimeSpan GetRetryDelay(int attempts) {
-            if (_options.RetryDelay <= TimeSpan.Zero)
+            // WTF?: Somehow when running groups of tests (parallel is disabled) we go from this being set to zero to it having the default value of 1 minute
+            if (_retryDelay <= TimeSpan.Zero) {
                 return TimeSpan.Zero;
+            }
 
             int maxMultiplier = _options.RetryMultipliers.Length > 0 ? _options.RetryMultipliers.Last() : 1;
             int multiplier = attempts <= _options.RetryMultipliers.Length ? _options.RetryMultipliers[attempts - 1] : maxMultiplier;
-            return TimeSpan.FromMilliseconds(_options.RetryDelay.TotalMilliseconds * multiplier);
+            return TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * multiplier);
         }
 
         protected override Task<IEnumerable<T>> GetDeadletterItemsImplAsync(CancellationToken cancellationToken) {
@@ -563,9 +551,12 @@ namespace Foundatio.Queues {
                     if (_logger.IsEnabled(LogLevel.Information))
                         _logger.LogInformation("{WorkId} Auto abandon item. Renewed: {RenewedTime:o} Current: {UtcNow:o} Timeout: {WorkItemTimeout:g}", workId, renewedTime, utcNow, _options.WorkItemTimeout);
                     var entry = await GetQueueEntryAsync(workId).AnyContext();
-                    if (entry == null)
+                    if (entry == null) {
+                        _logger.LogError("{WorkId} Error getting queue entry for work item timeout", workId);
                         continue;
+                    }
 
+                    _logger.LogError("{WorkId} AbandonAsync", workId);
                     await AbandonAsync(entry).AnyContext();
                     Interlocked.Increment(ref _workItemTimeoutCount);
                 }
@@ -588,14 +579,12 @@ namespace Foundatio.Queues {
                     var tx = Database.CreateTransaction();
                     tx.ListRemoveAsync(_waitListName, waitId);
                     tx.ListLeftPushAsync(_queueListName, waitId);
+                    tx.KeyDeleteAsync(GetWaitTimeKey(waitId));
                     bool success = await Run.WithRetriesAsync(() => tx.ExecuteAsync(), logger: _logger).AnyContext();
                     if (!success)
                         throw new Exception("Unable to move item to queue list.");
 
-                    await Run.WithRetriesAsync(() => Task.WhenAll(
-                        Database.KeyDeleteAsync(GetWaitTimeKey(waitId)),
-                        _subscriber.PublishAsync(GetTopicName(), waitId)
-                    ), logger: _logger).AnyContext();
+                    await Run.WithRetriesAsync(() => _subscriber.PublishAsync(GetTopicName(), waitId), logger: _logger).AnyContext();
                 }
             } catch (Exception ex) {
                 if (_logger.IsEnabled(LogLevel.Error)) _logger.LogError(ex, "Error adding items back to the queue after the retry delay: {Message}", ex.Message);
@@ -612,16 +601,40 @@ namespace Foundatio.Queues {
         }
 
         private async Task DoMaintenanceWorkLoopAsync(CancellationToken disposedCancellationToken) {
+            _logger.LogInformation("Starting Maintenance loop. Name: {Name} Id: {Id}", _options.Name, QueueId);
+
             while (!disposedCancellationToken.IsCancellationRequested) {
                 bool isTraceLogLevelEnabled = _logger.IsEnabled(LogLevel.Trace);
                 if (isTraceLogLevelEnabled) 
-                    _logger.LogTrace("Requesting Maintenance Lock:  Name: {Name} Id: {Id}", _options.Name, QueueId);
+                    _logger.LogTrace("Requesting Maintenance Lock. Name: {Name} Id: {Id}", _options.Name, QueueId);
                 
                 var utcNow = SystemClock.UtcNow;
                 bool gotLock = await _maintenanceLockProvider.TryUsingAsync($"{_options.Name}-maintenance", DoMaintenanceWorkAsync, acquireTimeout: TimeSpan.FromSeconds(30)).AnyContext();
                 
                 if (isTraceLogLevelEnabled) 
-                    _logger.LogTrace("{Status} Maintenance Lock: Name: {Name} Id: {Id} Time To Acquire: {AcquireDuration:g}", gotLock ? "Acquired" : "Failed to acquire", _options.Name, QueueId, SystemClock.UtcNow.Subtract(utcNow));
+                    _logger.LogTrace("{Status} Maintenance Lock. Name: {Name} Id: {Id} Time To Acquire: {AcquireDuration:g}", gotLock ? "Acquired" : "Failed to acquire", _options.Name, QueueId, SystemClock.UtcNow.Subtract(utcNow));
+            }
+        }
+
+        private async Task LoadScriptsAsync() {
+            if (_scriptsLoaded)
+                return;
+
+            using (await _lock.LockAsync().AnyContext()) {
+                if (_scriptsLoaded)
+                    return;
+
+                var dequeueId = LuaScript.Prepare(DequeueIdScript);
+
+                foreach (var endpoint in _options.ConnectionMultiplexer.GetEndPoints()) {
+                    var server = _options.ConnectionMultiplexer.GetServer(endpoint);
+                    if (server.IsReplica)
+                        continue;
+
+                    _dequeueId = await dequeueId.LoadAsync(server).AnyContext();
+                }
+
+                _scriptsLoaded = true;
             }
         }
 
