@@ -608,8 +608,6 @@ namespace Foundatio.Queues {
         }
 
         private async Task DoMaintenanceWorkLoopAsync() {
-            _logger.LogInformation("Starting Maintenance loop. Name: {Name} Id: {Id}", _options.Name, QueueId);
-
             while (!_queueDisposedCancellationTokenSource.IsCancellationRequested) {
                 _logger.LogTrace("Requesting Maintenance Lock. Name: {Name} Id: {Id}", _options.Name, QueueId);
                 
