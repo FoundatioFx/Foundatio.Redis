@@ -31,7 +31,6 @@ namespace Foundatio.Queues {
         private Task _maintenanceTask;
         private bool _isSubscribed;
         private readonly TimeSpan _payloadTimeToLive;
-        private readonly TimeSpan _retryDelay;
         private bool _scriptsLoaded;
 
         private LoadedLuaScript _dequeueId;
@@ -44,7 +43,6 @@ namespace Foundatio.Queues {
             _cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = options.ConnectionMultiplexer, Serializer = _serializer });
 
             _payloadTimeToLive = GetPayloadTtl();
-            _retryDelay = options.RetryDelay;
             _subscriber = _options.ConnectionMultiplexer.GetSubscriber();
 
             string listPrefix = _options.ConnectionMultiplexer.IsCluster() ? "{q:" + _options.Name + "}" : $"q:{_options.Name}";
@@ -57,7 +55,7 @@ namespace Foundatio.Queues {
             var interval = _options.WorkItemTimeout > TimeSpan.FromSeconds(1) ? _options.WorkItemTimeout.Min(TimeSpan.FromMinutes(1)) : TimeSpan.FromSeconds(1);
             _maintenanceLockProvider = new ThrottlingLockProvider(_cache, 1, interval);
 
-            _logger.LogInformation("Queue {QueueId} created. Retries: {Retries} Retry Delay: {RetryDelay:g}, Maintenance Interval: {MaintenanceInterval:g}", QueueId, _options.Retries, _retryDelay, interval);
+            _logger.LogInformation("Queue {QueueId} created. Retries: {Retries} Retry Delay: {RetryDelay:g}, Maintenance Interval: {MaintenanceInterval:g}", QueueId, _options.Retries, _options.RetryDelay, interval);
         }
 
         public RedisQueue(Builder<RedisQueueOptionsBuilder<T>, RedisQueueOptions<T>> config)
@@ -444,13 +442,13 @@ namespace Foundatio.Queues {
         }
 
         private TimeSpan GetRetryDelay(int attempts) {
-            if (_retryDelay <= TimeSpan.Zero) {
+            if (_options.RetryDelay <= TimeSpan.Zero) {
                 return TimeSpan.Zero;
             }
 
             int maxMultiplier = _options.RetryMultipliers.Length > 0 ? _options.RetryMultipliers.Last() : 1;
             int multiplier = attempts <= _options.RetryMultipliers.Length ? _options.RetryMultipliers[attempts - 1] : maxMultiplier;
-            return TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * multiplier);
+            return TimeSpan.FromMilliseconds(_options.RetryDelay.TotalMilliseconds * multiplier);
         }
 
         protected override Task<IEnumerable<T>> GetDeadletterItemsImplAsync(CancellationToken cancellationToken) {
