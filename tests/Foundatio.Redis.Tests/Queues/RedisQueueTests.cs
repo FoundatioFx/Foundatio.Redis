@@ -144,8 +144,8 @@ namespace Foundatio.Redis.Tests.Queues {
         }
 
         [Fact]
-        public override Task CompleteOnAutoAbandonedHandledProperly_Issue239() {
-            return base.CompleteOnAutoAbandonedHandledProperly_Issue239();
+        public override Task CanHandleAutoAbandonInWorker() {
+            return base.CanHandleAutoAbandonInWorker();
         }
 
         [RetryFact]
