@@ -1,7 +1,5 @@
 name: Build
 on: [push, pull_request]
-env:
-  DOTNET_NOLOGO: true # remove after: https://github.com/actions/virtual-environments/pull/957
 
 jobs:
   build:
@@ -39,8 +37,8 @@ jobs:
           
           # GitHub
           dotnet nuget push $package --source https://nuget.pkg.github.com/foundatiofx/index.json --api-key ${{ secrets.GITHUB_TOKEN }} --skip-duplicate
-
-          # feedz (remove once GPR supports anonymous access)
+          
+          # Feedz (remove once GitHub supports anonymous access)
           dotnet nuget push $package --source https://f.feedz.io/foundatio/foundatio/nuget --api-key ${{ secrets.FEEDZ_KEY }} --skip-duplicate
         done
     - name: Publish Release Packages
@@ -50,4 +48,3 @@ jobs:
           echo "${0##*/}": Pushing $package...
           dotnet nuget push $package --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_KEY }} --skip-duplicate
         done
-
