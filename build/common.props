@@ -11,7 +11,7 @@
     <MinVerTagPrefix>v</MinVerTagPrefix>
     <ReferenceFoundatioSource Condition="$(SolutionName.Contains('All')) Or !$(SolutionName.Contains('Foundatio'))">true</ReferenceFoundatioSource>
 
-    <Copyright>Copyright (c) 2020 Foundatio.  All rights reserved.</Copyright>
+    <Copyright>Copyright (c) 2021 Foundatio.  All rights reserved.</Copyright>
     <Authors>FoundatioFx</Authors>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <WarningsAsErrors>true</WarningsAsErrors>
