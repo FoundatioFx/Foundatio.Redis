@@ -61,7 +61,7 @@ namespace Foundatio.Messaging {
             await SendMessageToSubscribersAsync(message).AnyContext();
         }
 
-        protected override async Task PublishImplAsync(string messageType, object message, TimeSpan? delay, QueueEntryOptions options, CancellationToken cancellationToken) {
+        protected override async Task PublishImplAsync(string messageType, object message, TimeSpan? delay, MessageOptions options, CancellationToken cancellationToken) {
             var mappedType = GetMappedMessageType(messageType);
             if (delay.HasValue && delay.Value > TimeSpan.Zero) {
                 if (_logger.IsEnabled(LogLevel.Trace)) _logger.LogTrace("Schedule delayed message: {MessageType} ({Delay}ms)", messageType, delay.Value.TotalMilliseconds);
