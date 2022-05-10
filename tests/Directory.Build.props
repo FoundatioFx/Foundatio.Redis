@@ -9,8 +9,9 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.1.0" />
     <PackageReference Include="xunit" Version="2.4.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3" />
-    <PackageReference Include="Foundatio.TestHarness" Version="10.4.0" Condition="'$(ReferenceFoundatioSource)' == '' OR '$(ReferenceFoundatioSource)' == 'false'" />
+    <PackageReference Include="GitHubActionsTestLogger" Version="1.4.1"  PrivateAssets="All" />
 
+    <PackageReference Include="Foundatio.TestHarness" Version="10.4.0" Condition="'$(ReferenceFoundatioSource)' == '' OR '$(ReferenceFoundatioSource)' == 'false'" />
     <ProjectReference Include="..\..\..\Foundatio\src\Foundatio.TestHarness\Foundatio.TestHarness.csproj" Condition="'$(ReferenceFoundatioSource)' == 'true'" />
   </ItemGroup>
 </Project>
