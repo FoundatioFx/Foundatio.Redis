@@ -3,4 +3,5 @@ on: [push, pull_request]
 
 jobs:
   build:
-    uses: FoundatioFx/Foundatio/.github/workflows/build.yml@master
+    uses: FoundatioFx/Foundatio/.github/workflows/build-workflow.yml@master
+    secrets: inherit
