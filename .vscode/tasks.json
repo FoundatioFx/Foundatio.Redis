@@ -39,7 +39,7 @@
     },
     {
       "label": "docker: redis",
-      "command": "docker-compose up",
+      "command": "docker compose up",
       "type": "shell",
       "isBackground": true,
       "group": "test",
