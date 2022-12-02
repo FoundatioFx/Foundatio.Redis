@@ -11,7 +11,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5" />
     <PackageReference Include="GitHubActionsTestLogger" Version="2.0.1"  PrivateAssets="All" />
 
-    <PackageReference Include="Foundatio.TestHarness" Version="10.5.1-alpha.0.30" Condition="'$(ReferenceFoundatioSource)' == '' OR '$(ReferenceFoundatioSource)' == 'false'" />
+    <PackageReference Include="Foundatio.TestHarness" Version="10.5.1-alpha.0.31" Condition="'$(ReferenceFoundatioSource)' == '' OR '$(ReferenceFoundatioSource)' == 'false'" />
     <ProjectReference Include="..\..\..\Foundatio\src\Foundatio.TestHarness\Foundatio.TestHarness.csproj" Condition="'$(ReferenceFoundatioSource)' == 'true'" />
   </ItemGroup>
 </Project>
