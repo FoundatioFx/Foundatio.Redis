@@ -32,7 +32,7 @@ namespace Foundatio.Caching
             return this;
         }
 
-        public RedisCacheClientOptionsBuilder ReadMode (CommandFlags commandFlags)
+        public RedisCacheClientOptionsBuilder ReadMode(CommandFlags commandFlags)
         {
             Target.ReadMode = commandFlags;
             return this;
