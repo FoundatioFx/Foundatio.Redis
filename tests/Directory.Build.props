@@ -11,7 +11,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.0.2" />
     <PackageReference Include="GitHubActionsTestLogger" Version="2.4.1" PrivateAssets="All" />
 
-    <PackageReference Include="Foundatio.TestHarness" Version="11.0.8" Condition="'$(ReferenceFoundatioSource)' == '' OR '$(ReferenceFoundatioSource)' == 'false'" />
+    <PackageReference Include="Foundatio.TestHarness" Version="11.0.9-alpha.cache-client-list-item-sliding-cache-expiration.0.11" Condition="'$(ReferenceFoundatioSource)' == '' OR '$(ReferenceFoundatioSource)' == 'false'" />
     <ProjectReference Include="..\..\..\Foundatio\src\Foundatio.TestHarness\Foundatio.TestHarness.csproj" Condition="'$(ReferenceFoundatioSource)' == 'true'" />
   </ItemGroup>
 </Project>
