@@ -12,6 +12,8 @@ public class RedisQueueOptions<T> : SharedQueueOptions<T> where T : class
     public TimeSpan DeadLetterTimeToLive { get; set; } = TimeSpan.FromDays(1);
     public int DeadLetterMaxItems { get; set; } = 100;
     public bool RunMaintenanceTasks { get; set; } = true;
+
+    public int? DbId { get; set; }
 }
 
 public class RedisQueueOptionsBuilder<T> : SharedQueueOptionsBuilder<T, RedisQueueOptions<T>, RedisQueueOptionsBuilder<T>> where T : class
@@ -49,6 +51,12 @@ public class RedisQueueOptionsBuilder<T> : SharedQueueOptionsBuilder<T, RedisQue
     public RedisQueueOptionsBuilder<T> RunMaintenanceTasks(bool runMaintenanceTasks)
     {
         Target.RunMaintenanceTasks = runMaintenanceTasks;
+        return this;
+    }
+
+    public RedisQueueOptionsBuilder<T> UseDatabase(int? dbId)
+    {
+        Target.DbId = dbId;
         return this;
     }
 }

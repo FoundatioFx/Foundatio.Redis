@@ -19,6 +19,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     private readonly RedisCacheClientOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
+    private readonly int _dbId;
 
     private readonly AsyncLock _lock = new();
     private bool _scriptsLoaded;
@@ -35,15 +36,19 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         _timeProvider = options.TimeProvider ?? TimeProvider.System;
         options.Serializer ??= DefaultSerializer.Instance;
         _logger = options.LoggerFactory?.CreateLogger(typeof(RedisCacheClient)) ?? NullLogger.Instance;
+
+        _dbId = _options.DbId ?? -1;
+
         options.ConnectionMultiplexer.ConnectionRestored += ConnectionMultiplexerOnConnectionRestored;
     }
 
     public RedisCacheClient(Builder<RedisCacheClientOptionsBuilder, RedisCacheClientOptions> config)
         : this(config(new RedisCacheClientOptionsBuilder()).Build())
     {
+
     }
 
-    public IDatabase Database => _options.ConnectionMultiplexer.GetDatabase(_options.DbId ?? -1);
+    public IDatabase Database => _options.ConnectionMultiplexer.GetDatabase(_dbId);
 
     public Task<bool> RemoveAsync(string key)
     {
@@ -84,8 +89,8 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
                 try
                 {
-                    long dbSize = await server.DatabaseSizeAsync().AnyContext();
-                    await server.FlushDatabaseAsync().AnyContext();
+                    long dbSize = await server.DatabaseSizeAsync(_dbId).AnyContext();
+                    await server.FlushDatabaseAsync(_dbId).AnyContext();
                     deleted += dbSize;
                     continue;
                 }
@@ -100,7 +105,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                     // A Performance win could be had if we are sure dbSize didn't fail and we know nothing was changing
                     // keys while we were deleting.
                     var seen = new HashSet<RedisKey>();
-                    await foreach (var key in server.KeysAsync().ConfigureAwait(false))
+                    await foreach (var key in server.KeysAsync(_dbId).ConfigureAwait(false))
                         seen.Add(key);
 
                     foreach (var batch in seen.Batch(batchSize))
