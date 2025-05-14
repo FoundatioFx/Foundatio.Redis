@@ -16,6 +16,7 @@ public class RedisCacheClientOptions : SharedOptions
     /// </summary>
     public CommandFlags ReadMode { get; set; } = CommandFlags.None;
 
+    public int? DbId { get; set; }
 }
 
 public class RedisCacheClientOptionsBuilder : SharedOptionsBuilder<RedisCacheClientOptions, RedisCacheClientOptionsBuilder>
@@ -35,6 +36,12 @@ public class RedisCacheClientOptionsBuilder : SharedOptionsBuilder<RedisCacheCli
     public RedisCacheClientOptionsBuilder ReadMode(CommandFlags commandFlags)
     {
         Target.ReadMode = commandFlags;
+        return this;
+    }
+
+    public RedisCacheClientOptionsBuilder UseDatabase(int? db)
+    {
+        Target.DbId = db;
         return this;
     }
 }

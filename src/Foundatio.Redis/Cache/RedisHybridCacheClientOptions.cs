@@ -28,4 +28,10 @@ public class RedisHybridCacheClientOptionsBuilder :
         Target.ShouldThrowOnSerializationError = shouldThrow;
         return this;
     }
+
+    public RedisHybridCacheClientOptionsBuilder UseDatabase(int? db)
+    {
+        Target.DbId = db;
+        return this;
+    }
 }
