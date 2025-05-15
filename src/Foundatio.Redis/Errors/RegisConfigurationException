@@ -1,0 +1,10 @@
+using System:
+
+namespace Foundatio.Redis.Errors;
+
+public class RedisConfigurationExceptionException : Exception
+{
+    public RedisConfigurationExceptionException() { }
+    public RedisConfigurationExceptionException(string message) : base(message) { }
+    public RedisConfigurationExceptionException(string message, System.Exception inner) : base(message, inner) { }
+}

@@ -35,9 +35,13 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         _timeProvider = options.TimeProvider ?? TimeProvider.System;
         options.Serializer ??= DefaultSerializer.Instance;
         _logger = options.LoggerFactory?.CreateLogger(typeof(RedisCacheClient)) ?? NullLogger.Instance;
- 
 
         options.ConnectionMultiplexer.ConnectionRestored += ConnectionMultiplexerOnConnectionRestored;
+        
+        if (_options.Database != -1 && options.ConnectionMultiplexer.IsCluster())
+        {
+            throw new RedisConfigurationExceptionException();
+        }
     }
 
     public RedisCacheClient(Builder<RedisCacheClientOptionsBuilder, RedisCacheClientOptions> config)
