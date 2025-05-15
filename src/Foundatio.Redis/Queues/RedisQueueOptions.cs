@@ -12,8 +12,7 @@ public class RedisQueueOptions<T> : SharedQueueOptions<T> where T : class
     public TimeSpan DeadLetterTimeToLive { get; set; } = TimeSpan.FromDays(1);
     public int DeadLetterMaxItems { get; set; } = 100;
     public bool RunMaintenanceTasks { get; set; } = true;
-
-    public int? DbId { get; set; }
+    public int Database { get; set; } = -1;
 }
 
 public class RedisQueueOptionsBuilder<T> : SharedQueueOptionsBuilder<T, RedisQueueOptions<T>, RedisQueueOptionsBuilder<T>> where T : class
@@ -54,9 +53,14 @@ public class RedisQueueOptionsBuilder<T> : SharedQueueOptionsBuilder<T, RedisQue
         return this;
     }
 
-    public RedisQueueOptionsBuilder<T> UseDatabase(int? dbId)
+    public RedisQueueOptionsBuilder<T> UseDatabase(int database)
     {
-        Target.DbId = dbId;
+        if (database < -1) // We consider -1 as a valid value in respect for the default behaviour of stack exchange redis
+        {
+            throw new ArgumentOutOfRangeException(nameof(database), "database number cannot be less than 0.");
+        }
+
+        Target.Database = database;
         return this;
     }
 }

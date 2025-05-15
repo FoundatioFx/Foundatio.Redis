@@ -35,7 +35,6 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
     private readonly TimeSpan _payloadTimeToLive;
     private bool _scriptsLoaded;
     private readonly string _listPrefix;
-    private readonly int _dbId;
 
     private LoadedLuaScript _dequeueId;
 
@@ -60,15 +59,13 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
         var interval = _options.WorkItemTimeout > TimeSpan.FromSeconds(1) ? _options.WorkItemTimeout.Min(TimeSpan.FromMinutes(1)) : TimeSpan.FromSeconds(1);
         _maintenanceLockProvider = new ThrottlingLockProvider(_cache, 1, interval);
 
-        _dbId = options.DbId ?? -1;
-
         _logger.LogInformation("Queue {QueueName}:{QueueId} created. Retries: {Retries} Retry Delay: {RetryDelay:g}, Maintenance Interval: {MaintenanceInterval:g}", _options.Name, QueueId, _options.Retries, _options.RetryDelay, interval);
     }
 
     public RedisQueue(Builder<RedisQueueOptionsBuilder<T>, RedisQueueOptions<T>> config)
         : this(config(new RedisQueueOptionsBuilder<T>()).Build()) { }
 
-    public IDatabase Database => _options.ConnectionMultiplexer.GetDatabase(_dbId);
+    public IDatabase Database => _options.ConnectionMultiplexer.GetDatabase(_options.Database);
 
     protected override Task EnsureQueueCreatedAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
 
