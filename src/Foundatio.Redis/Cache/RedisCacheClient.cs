@@ -8,7 +8,6 @@ using Foundatio.Redis;
 using Foundatio.Redis.Extensions;
 using Foundatio.Redis.Utility;
 using Foundatio.Serializer;
-using Foundatio.Redis.Errors;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using StackExchange.Redis;
@@ -38,13 +37,6 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         _logger = options.LoggerFactory?.CreateLogger(typeof(RedisCacheClient)) ?? NullLogger.Instance;
 
         options.ConnectionMultiplexer.ConnectionRestored += ConnectionMultiplexerOnConnectionRestored;
-        
-        // Cluster config only valid between -1 and 0.
-        // -1 is default db parameter in stack exchange redis
-        if (!(options.Database >= -1 && options.Database <= 0 ) && options.ConnectionMultiplexer.IsCluster())
-        {
-            throw new RedisConfigurationException("database must be -1 or 0 when using clustering.");
-        }
     }
 
     public RedisCacheClient(Builder<RedisCacheClientOptionsBuilder, RedisCacheClientOptions> config)

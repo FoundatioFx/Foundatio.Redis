@@ -11,7 +11,6 @@ using Foundatio.Lock;
 using Foundatio.Redis;
 using Foundatio.Redis.Utility;
 using Foundatio.Utility;
-using Foundatio.Redis.Errors;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 #pragma warning disable 4014
@@ -45,13 +44,6 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
             throw new ArgumentException("ConnectionMultiplexer is required.");
 
         options.ConnectionMultiplexer.ConnectionRestored += ConnectionMultiplexerOnConnectionRestored;
-
-        // Cluster config only valid between -1 and 0.
-        // -1 is default db parameter in stack exchange redis
-        if (!(options.Database >= -1 && options.Database <= 0 ) && options.ConnectionMultiplexer.IsCluster())
-        {
-            throw new RedisConfigurationException("database must be -1 or 0 when using clustering.");
-        }
 
         _cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = options.ConnectionMultiplexer, Serializer = _serializer });
 
