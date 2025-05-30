@@ -1,7 +1,7 @@
 <Project>
 
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
     <Product>Foundatio</Product>
     <Description>Pluggable foundation blocks for building distributed apps.</Description>
     <PackageProjectUrl>https://github.com/FoundatioFx/Foundatio.Redis</PackageProjectUrl>
@@ -11,7 +11,7 @@
     <MinVerTagPrefix>v</MinVerTagPrefix>
     <ReferenceFoundatioSource Condition="$(SolutionName.Contains('All')) Or !$(SolutionName.Contains('Foundatio'))">true</ReferenceFoundatioSource>
 
-    <Copyright>Copyright (c) 2024 Foundatio.  All rights reserved.</Copyright>
+    <Copyright>Copyright (c) 2025 Foundatio.  All rights reserved.</Copyright>
     <Authors>FoundatioFx</Authors>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <WarningsAsErrors>true</WarningsAsErrors>
