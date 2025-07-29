@@ -5,17 +5,24 @@ using Foundatio.Tests.Caching;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
-using IAsyncLifetime = Xunit.IAsyncLifetime;
 
 namespace Foundatio.Redis.Tests.Caching;
 
-public class RedisHybridCacheClientTests : HybridCacheClientTestBase, IAsyncLifetime
+public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsyncLifetime
 {
-    public RedisHybridCacheClientTests(ITestOutputHelper output) : base(output)
-    {
-    }
+    public ScopedRedisHybridCacheClientTests(ITestOutputHelper output) : base(output) { }
 
     protected override ICacheClient GetCacheClient(bool shouldThrowOnSerializationError = true)
+    {
+        return new ScopedCacheClient(new RedisHybridCacheClient(o => o
+                .ConnectionMultiplexer(SharedConnection.GetMuxer(Log))
+                .LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError),
+            localConfig => localConfig
+                .CloneValues(true)
+                .ShouldThrowOnSerializationError(shouldThrowOnSerializationError)), "scoped");
+    }
+
+    protected override HybridCacheClient GetDistributedHybridCacheClient(bool shouldThrowOnSerializationError = true)
     {
         return new RedisHybridCacheClient(o => o
                 .ConnectionMultiplexer(SharedConnection.GetMuxer(Log))

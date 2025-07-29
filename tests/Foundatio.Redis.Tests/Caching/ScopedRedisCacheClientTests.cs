@@ -5,24 +5,18 @@ using Foundatio.Tests.Caching;
 using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
-using IAsyncLifetime = Xunit.IAsyncLifetime;
 
 namespace Foundatio.Redis.Tests.Caching;
 
-public class RedisHybridCacheClientTests : HybridCacheClientTestBase, IAsyncLifetime
+public class ScopedRedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
 {
-    public RedisHybridCacheClientTests(ITestOutputHelper output) : base(output)
+    public ScopedRedisCacheClientTests(ITestOutputHelper output) : base(output)
     {
     }
 
     protected override ICacheClient GetCacheClient(bool shouldThrowOnSerializationError = true)
     {
-        return new RedisHybridCacheClient(o => o
-                .ConnectionMultiplexer(SharedConnection.GetMuxer(Log))
-                .LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError),
-            localConfig => localConfig
-                .CloneValues(true)
-                .ShouldThrowOnSerializationError(shouldThrowOnSerializationError));
+        return new ScopedCacheClient(new RedisCacheClient(o => o.ConnectionMultiplexer(SharedConnection.GetMuxer(Log)).LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError)), "scoped");
     }
 
     [Fact]
@@ -292,36 +286,6 @@ public class RedisHybridCacheClientTests : HybridCacheClientTestBase, IAsyncLife
         return base.MeasureSerializerComplexThroughputAsync();
     }
 
-    [Fact]
-    public override Task CanInvalidateLocalCacheViaRemoveAllAsync()
-    {
-        return base.CanInvalidateLocalCacheViaRemoveAllAsync();
-    }
-
-    [Fact]
-    protected override Task CanInvalidateLocalCacheViaRemoveByPrefixAsync()
-    {
-        return base.CanInvalidateLocalCacheViaRemoveByPrefixAsync();
-    }
-
-    [Fact]
-    protected override Task WillUseLocalCache()
-    {
-        return base.WillUseLocalCache();
-    }
-
-    [Fact(Skip = "TODO: Look into this as the local cache client maintenance never schedules for expiration")]
-    protected override Task WillExpireRemoteItems()
-    {
-        return base.WillExpireRemoteItems();
-    }
-
-    [Fact]
-    protected override Task WillWorkWithSets()
-    {
-        return base.WillWorkWithSets();
-    }
-
     public Task InitializeAsync()
     {
         _logger.LogDebug("Initializing");
@@ -332,8 +296,6 @@ public class RedisHybridCacheClientTests : HybridCacheClientTestBase, IAsyncLife
     public Task DisposeAsync()
     {
         _logger.LogDebug("Disposing");
-        Dispose();
-
         return Task.CompletedTask;
     }
 }
