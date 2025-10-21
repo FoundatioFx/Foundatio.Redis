@@ -246,6 +246,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         }
     }
 
+
     public async Task<IDictionary<string, CacheValue<T>>> GetAllAsync<T>(IEnumerable<string> keys)
     {
         if (keys is null)
@@ -256,6 +257,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         if (redisKeys.Length == 0)
             return result;
 
+        // parallelize?
         if (_options.ConnectionMultiplexer.IsCluster())
         {
             foreach (var hashSlotGroup in redisKeys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
@@ -284,19 +286,25 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         if (page is < 1)
             throw new ArgumentOutOfRangeException(nameof(page), "Page cannot be less than 1");
 
-        await RemoveExpiredListValuesAsync<T>(key, typeof(T) == typeof(string)).AnyContext();
-
-        if (!page.HasValue)
+        try
         {
-            var set = await Database.SortedSetRangeByScoreAsync(key, flags: _options.ReadMode).AnyContext();
-            return RedisValuesToCacheValue<T>(set);
+            if (!page.HasValue)
+            {
+                var set = await Database.SortedSetRangeByScoreAsync(key, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds() + 1, flags: _options.ReadMode).AnyContext();
+                return RedisValuesToCacheValue<T>(set);
+            }
+            else
+            {
+                long skip = (page.Value - 1) * pageSize;
+                var set = await Database.SortedSetRangeByScoreAsync(key, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds() + 1, skip: skip, take: pageSize, flags: _options.ReadMode).AnyContext();
+                return RedisValuesToCacheValue<T>(set);
+            }
         }
-        else
+        catch (RedisServerException ex) when (ex.Message.StartsWith("WRONGTYPE"))
         {
-            long start = (page.Value - 1) * pageSize;
-            long end = start + pageSize - 1;
-            var set = await Database.SortedSetRangeByRankAsync(key, start, end, flags: _options.ReadMode).AnyContext();
-            return RedisValuesToCacheValue<T>(set);
+            _logger.LogInformation(ex, "Migrating legacy set to sorted set for key: {Key}", key);
+            await MigrateLegacySetToSortedSetForKeyAsync<T>(key, typeof(T) == typeof(string)).AnyContext();
+            return await GetListAsync<T>(key, page, pageSize).AnyContext();
         }
     }
 
@@ -375,7 +383,10 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     {
         var items = await Database.SortedSetRangeByRankWithScoresAsync(key, 0, 0, order: Order.Descending).AnyContext();
         if (items.Length == 0)
+        {
+            _logger.LogTrace("Sorted set is empty for key: {Key}, expiration will not be set", key);
             return;
+        }
 
         long highestExpirationInMs = (long)items.Single().Score;
         if (highestExpirationInMs > MaxUnixEpochMilliseconds)
@@ -403,32 +414,35 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         catch (RedisServerException ex) when (ex.Message.StartsWith("WRONGTYPE"))
         {
             _logger.LogInformation(ex, "Migrating legacy set to sorted set for key: {Key}", key);
-
-            // convert legacy set to sorted set
-            var oldItems = await Database.SetMembersAsync(key).AnyContext();
-            await Database.KeyDeleteAsync(key).AnyContext();
-
-            var currentKeyExpiresIn = await GetExpirationAsync(key).AnyContext();
-            if (isStringValues)
-            {
-                var oldItemValues = new List<string>(oldItems.Length);
-                foreach (string oldItem in RedisValuesToCacheValue<string>(oldItems).Value)
-                    oldItemValues.Add(oldItem);
-
-                await ListAddAsync(key, oldItemValues, currentKeyExpiresIn).AnyContext();
-            }
-            else
-            {
-                var oldItemValues = new List<T>(oldItems.Length);
-                foreach (var oldItem in RedisValuesToCacheValue<T>(oldItems).Value)
-                    oldItemValues.Add(oldItem);
-
-                await ListAddAsync(key, oldItemValues, currentKeyExpiresIn).AnyContext();
-            }
-
-            if (currentKeyExpiresIn.HasValue)
-                await Database.KeyExpireAsync(key, (DateTime?)null).AnyContext();
+            await MigrateLegacySetToSortedSetForKeyAsync<T>(key, isStringValues).AnyContext();
         }
+    }
+
+    private async Task MigrateLegacySetToSortedSetForKeyAsync<T>(string key, bool isStringValues)
+    {
+        // convert legacy set to sorted set
+        var oldItems = await Database.SetMembersAsync(key).AnyContext();
+        var currentKeyExpiresIn = await GetExpirationAsync(key).AnyContext();
+        await Database.KeyDeleteAsync(key).AnyContext();
+        if (isStringValues)
+        {
+            var oldItemValues = new List<string>(oldItems.Length);
+            foreach (string oldItem in RedisValuesToCacheValue<string>(oldItems).Value)
+                oldItemValues.Add(oldItem);
+
+            await ListAddAsync(key, oldItemValues, currentKeyExpiresIn).AnyContext();
+        }
+        else
+        {
+            var oldItemValues = new List<T>(oldItems.Length);
+            foreach (var oldItem in RedisValuesToCacheValue<T>(oldItems).Value)
+                oldItemValues.Add(oldItem);
+
+            await ListAddAsync(key, oldItemValues, currentKeyExpiresIn).AnyContext();
+        }
+
+        if (currentKeyExpiresIn.HasValue)
+            await Database.KeyExpireAsync(key, (DateTime?)null).AnyContext();
     }
 
     public Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null)
