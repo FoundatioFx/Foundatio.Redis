@@ -246,7 +246,6 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         }
     }
 
-
     public async Task<IDictionary<string, CacheValue<T>>> GetAllAsync<T>(IEnumerable<string> keys)
     {
         if (keys is null)
@@ -290,13 +289,13 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         {
             if (!page.HasValue)
             {
-                var set = await Database.SortedSetRangeByScoreAsync(key, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds() + 1, flags: _options.ReadMode).AnyContext();
+                var set = await Database.SortedSetRangeByScoreAsync(key, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds(), Double.PositiveInfinity, Exclude.Start, flags: _options.ReadMode).AnyContext();
                 return RedisValuesToCacheValue<T>(set);
             }
             else
             {
                 long skip = (page.Value - 1) * pageSize;
-                var set = await Database.SortedSetRangeByScoreAsync(key, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds() + 1, skip: skip, take: pageSize, flags: _options.ReadMode).AnyContext();
+                var set = await Database.SortedSetRangeByScoreAsync(key, _timeProvider.GetUtcNow().ToUnixTimeMilliseconds(), Double.PositiveInfinity, Exclude.Start, skip: skip, take: pageSize, flags: _options.ReadMode).AnyContext();
                 return RedisValuesToCacheValue<T>(set);
             }
         }
@@ -440,9 +439,6 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
             await ListAddAsync(key, oldItemValues, currentKeyExpiresIn).AnyContext();
         }
-
-        if (currentKeyExpiresIn.HasValue)
-            await Database.KeyExpireAsync(key, (DateTime?)null).AnyContext();
     }
 
     public Task<bool> SetAsync<T>(string key, T value, TimeSpan? expiresIn = null)
