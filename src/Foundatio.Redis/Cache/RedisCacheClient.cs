@@ -256,7 +256,6 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         if (redisKeys.Length == 0)
             return result;
 
-        // parallelize?
         if (_options.ConnectionMultiplexer.IsCluster())
         {
             foreach (var hashSlotGroup in redisKeys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
