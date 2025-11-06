@@ -31,8 +31,11 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     private LoadedLuaScript _replaceIfEqual;
     private LoadedLuaScript _setIfHigher;
     private LoadedLuaScript _setIfLower;
+    private LoadedLuaScript _getAllExpiration;
+    private LoadedLuaScript _setAllExpiration;
 
     public RedisCacheClient(RedisCacheClientOptions options)
+
     {
         _options = options;
         _timeProvider = options.TimeProvider ?? TimeProvider.System;
@@ -80,41 +83,63 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             if (endpoints.Length == 0)
                 return 0;
 
-            foreach (var endpoint in endpoints)
-            {
-                var server = _options.ConnectionMultiplexer.GetServer(endpoint);
-                if (server.IsReplica)
-                    continue;
+            // Get non-replica endpoints for processing
+            var nonReplicaEndpoints = endpoints
+                .Select(endpoint => _options.ConnectionMultiplexer.GetServer(endpoint))
+                .Where(server => !server.IsReplica)
+                .ToArray();
 
+            // Most Redis deployments have few endpoints (1-3), so parallelism here is helpful
+            // but not critical. Controlling it helps prevent excessive load on Redis cluster.
+            int maxEndpointParallelism = Math.Min(Environment.ProcessorCount, nonReplicaEndpoints.Length);
+
+            await Parallel.ForEachAsync(nonReplicaEndpoints, new ParallelOptions { MaxDegreeOfParallelism = maxEndpointParallelism },
+                async (server, ct) =>
+            {
+                // Try FLUSHDB first (fastest approach)
+                bool flushed = false;
                 try
                 {
                     long dbSize = await server.DatabaseSizeAsync(_options.Database).AnyContext();
                     await server.FlushDatabaseAsync(_options.Database).AnyContext();
-                    deleted += dbSize;
-                    continue;
+                    Interlocked.Add(ref deleted, dbSize);
+                    flushed = true;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Unable to flush database: {Message}", ex.Message);
+                    _logger.LogError(ex, "Unable to flush database on {Endpoint}: {Message}", server.EndPoint, ex.Message);
                 }
 
-                try
+                // If FLUSHDB failed, fall back to SCAN + DELETE
+                if (!flushed)
                 {
-                    // NOTE: We need to use a HashSet to avoid duplicate counts due to SCAN is non-deterministic.
-                    // A Performance win could be had if we are sure dbSize didn't fail and we know nothing was changing
-                    // keys while we were deleting.
-                    var seen = new HashSet<RedisKey>();
-                    await foreach (var key in server.KeysAsync(_options.Database).ConfigureAwait(false))
-                        seen.Add(key);
+                    try
+                    {
+                        // NOTE: We need to use a HashSet to avoid duplicate counts due to SCAN is non-deterministic.
+                        // A Performance win could be had if we are sure dbSize didn't fail and we know nothing was changing
+                        // keys while we were deleting.
+                        var seen = new HashSet<RedisKey>();
+                        await foreach (var key in server.KeysAsync(_options.Database).ConfigureAwait(false))
+                            seen.Add(key);
 
-                    foreach (var batch in seen.Chunk(batchSize))
-                        deleted += await Database.KeyDeleteAsync(batch.ToArray()).AnyContext();
+                    // Parallelize batch deletions with moderate concurrency to avoid Redis overload
+                    // Redis can become unstable with too many concurrent connections/requests
+                    // See: https://redis.io/docs/reference/clients/
+                    // Lower limit (8) since this runs after FLUSHDB failed, meaning we're deleting
+                    // potentially thousands or millions of keys - must avoid overwhelming Redis
+                        int maxParallelism = Math.Min(8, Environment.ProcessorCount);
+                        await Parallel.ForEachAsync(seen.Chunk(batchSize), new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, async (batch, ct) =>
+                        {
+                            long count = await Database.KeyDeleteAsync(batch.ToArray()).AnyContext();
+                            Interlocked.Add(ref deleted, count);
+                        }).AnyContext();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error deleting all keys on {Endpoint}: {Message}", server.EndPoint, ex.Message);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error deleting all keys: {Message}", ex.Message);
-                }
-            }
+            }).AnyContext();
         }
         else if (Database.Multiplexer.IsCluster())
         {
@@ -139,17 +164,26 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         }
         else
         {
-            foreach (var redisKeys in keys.Where(k => !String.IsNullOrEmpty(k)).Select(k => (RedisKey)k).Chunk(batchSize))
+            var keyBatches = keys.Where(k => !String.IsNullOrEmpty(k))
+                .Select(k => (RedisKey)k)
+                .Chunk(batchSize)
+                .ToArray();
+
+            // Parallelize batch deletions with moderate concurrency to avoid Redis overload
+            // Limit parallelism to 8 or Environment.ProcessorCount, whichever is smaller
+            int maxParallelism = Math.Min(8, Environment.ProcessorCount);
+            await Parallel.ForEachAsync(keyBatches, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, async (redisKeys, ct) =>
             {
                 try
                 {
-                    deleted += await Database.KeyDeleteAsync(redisKeys).AnyContext();
+                    long count = await Database.KeyDeleteAsync(redisKeys).AnyContext();
+                    Interlocked.Add(ref deleted, count);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Unable to delete keys ({Keys}): {Message}", redisKeys, ex.Message);
                 }
-            }
+            }).AnyContext();
         }
 
         return (int)deleted;
@@ -671,6 +705,110 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         return Database.KeyExpireAsync(key, expiresIn);
     }
 
+    public async Task<IDictionary<string, TimeSpan?>> GetAllExpirationAsync(IEnumerable<string> keys)
+    {
+        if (keys == null)
+            throw new ArgumentNullException(nameof(keys));
+
+        var keyList = keys.Where(k => !String.IsNullOrEmpty(k)).Distinct().ToList();
+        if (keyList.Count == 0)
+            return ReadOnlyDictionary<string, TimeSpan?>.Empty;
+
+        await LoadScriptsAsync().AnyContext();
+
+        if (_options.ConnectionMultiplexer.IsCluster())
+        {
+            // Use the default concurrency on .NET 8 (-1)
+            var result = new ConcurrentDictionary<string, TimeSpan?>(-1, keyList.Count);
+            await Parallel.ForEachAsync(
+                keyList.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)),
+                async (hashSlotGroup, ct) =>
+                {
+                    var hashSlotKeys = hashSlotGroup.Select(k => (RedisKey)k).ToArray();
+                    var redisResult = await Database.ScriptEvaluateAsync(_getAllExpiration.Hash, hashSlotKeys).AnyContext();
+
+                    if (redisResult.IsNull)
+                        return;
+
+                    // Lua script returns array of TTL values in milliseconds (in same order as keys)
+                    // -2 = key doesn't exist, -1 = no expiration, positive = TTL in ms
+                    var ttls = (long[])redisResult;
+                    for (int i = 0; i < hashSlotKeys.Length; i++)
+                    {
+                        string key = hashSlotKeys[i];
+                        long ttl = ttls[i];
+
+                        if (ttl >= 0)  // Only include keys with positive TTL (exclude non-existent and persistent)
+                            result[key] = TimeSpan.FromMilliseconds(ttl);
+                    }
+                }).AnyContext();
+
+            return result.AsReadOnly();
+        }
+        else
+        {
+            var redisKeys = keyList.Select(k => (RedisKey)k).ToArray();
+            var redisResult = await Database.ScriptEvaluateAsync(_getAllExpiration.Hash, redisKeys).AnyContext();
+
+            if (redisResult.IsNull)
+                return ReadOnlyDictionary<string, TimeSpan?>.Empty;
+
+            // Lua script returns array of TTL values in milliseconds (in same order as keys)
+            // -2 = key doesn't exist, -1 = no expiration, positive = TTL in ms
+            var ttls = (long[])redisResult;
+            var result = new Dictionary<string, TimeSpan?>();
+
+            for (int i = 0; i < redisKeys.Length; i++)
+            {
+                string key = redisKeys[i];
+                long ttl = ttls[i];
+
+                if (ttl >= 0)  // Only include keys with positive TTL (exclude non-existent and persistent)
+                    result[key] = TimeSpan.FromMilliseconds(ttl);
+            }
+
+            return result.AsReadOnly();
+        }
+    }
+
+    public async Task SetAllExpirationAsync(IDictionary<string, TimeSpan?> expirations)
+    {
+        if (expirations == null)
+            throw new ArgumentNullException(nameof(expirations));
+
+        var validExpirations = expirations.Where(kvp => !String.IsNullOrEmpty(kvp.Key)).ToList();
+
+        if (validExpirations.Count == 0)
+            return;
+
+        await LoadScriptsAsync().AnyContext();
+
+        if (_options.ConnectionMultiplexer.IsCluster())
+        {
+            await Parallel.ForEachAsync(
+                validExpirations.GroupBy(kvp => _options.ConnectionMultiplexer.HashSlot(kvp.Key)),
+                async (hashSlotGroup, ct) =>
+                {
+                    var hashSlotExpirations = hashSlotGroup.ToList();
+                    var keys = hashSlotExpirations.Select(kvp => (RedisKey)kvp.Key).ToArray();
+                    var values = hashSlotExpirations
+                        .Select(kvp => (RedisValue)(kvp.Value.HasValue ? (long)kvp.Value.Value.TotalMilliseconds : -1))
+                        .ToArray();
+
+                    await Database.ScriptEvaluateAsync(_setAllExpiration.Hash, keys, values).AnyContext();
+                }).AnyContext();
+        }
+        else
+        {
+            var keys = validExpirations.Select(kvp => (RedisKey)kvp.Key).ToArray();
+            var values = validExpirations
+                .Select(kvp => (RedisValue)(kvp.Value.HasValue ? (long)kvp.Value.Value.TotalMilliseconds : -1))
+                .ToArray();
+
+            await Database.ScriptEvaluateAsync(_setAllExpiration.Hash, keys, values).AnyContext();
+        }
+    }
+
     private async Task LoadScriptsAsync()
     {
         if (_scriptsLoaded)
@@ -681,24 +819,87 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             if (_scriptsLoaded)
                 return;
 
+            // Prepare all the Lua scripts
             var incrementWithExpire = LuaScript.Prepare(IncrementWithScript);
             var removeIfEqual = LuaScript.Prepare(RemoveIfEqualScript);
             var replaceIfEqual = LuaScript.Prepare(ReplaceIfEqualScript);
             var setIfHigher = LuaScript.Prepare(SetIfHigherScript);
             var setIfLower = LuaScript.Prepare(SetIfLowerScript);
+            var getAllExpiration = LuaScript.Prepare(GetAllExpirationScript);
+            var setAllExpiration = LuaScript.Prepare(SetAllExpirationScript);
 
-            foreach (var endpoint in _options.ConnectionMultiplexer.GetEndPoints())
+            // Get all non-replica endpoints
+            var endpoints = _options.ConnectionMultiplexer.GetEndPoints()
+                .Select(ep => _options.ConnectionMultiplexer.GetServer(ep))
+                .Where(server => !server.IsReplica)
+                .ToArray();
+
+            if (endpoints.Length == 0)
+                return;
+
+            // In Redis Cluster, each node maintains its own script cache
+            // Scripts must be loaded on every node where they might execute
+            // See: https://redis.io/docs/latest/develop/programmability/eval-intro/#evalsha-and-script-load
+            // See: https://redis.io/docs/management/scaling/#redis-cluster-architecture
+
+            // Store the loaded scripts from each node separately
+            // We'll load scripts on all servers in parallel first, then set the class fields
+            // once using the results from any server (scripts have same SHA everywhere)
+
+            // Create a task to load scripts on all servers in parallel
+            var loadTasks = new List<Task<(
+                LoadedLuaScript IncrementWithExpire,
+                LoadedLuaScript RemoveIfEqual,
+                LoadedLuaScript ReplaceIfEqual,
+                LoadedLuaScript SetIfHigher,
+                LoadedLuaScript SetIfLower,
+                LoadedLuaScript GetAllExpiration,
+                LoadedLuaScript SetAllExpiration)>>();
+
+            // Limit parallelism to Environment.ProcessorCount
+            int maxParallelism = Math.Min(Environment.ProcessorCount, endpoints.Length);
+            var options = new ParallelOptions { MaxDegreeOfParallelism = maxParallelism };
+
+            // Start script loading tasks for all endpoints
+            foreach (var server in endpoints)
             {
-                var server = _options.ConnectionMultiplexer.GetServer(endpoint);
                 if (server.IsReplica)
                     continue;
 
-                _incrementWithExpire = await incrementWithExpire.LoadAsync(server).AnyContext();
-                _removeIfEqual = await removeIfEqual.LoadAsync(server).AnyContext();
-                _replaceIfEqual = await replaceIfEqual.LoadAsync(server).AnyContext();
-                _setIfHigher = await setIfHigher.LoadAsync(server).AnyContext();
-                _setIfLower = await setIfLower.LoadAsync(server).AnyContext();
+                // Create and start task for this server - completely independent
+                var loadTask = Task.Run(async () => {
+                    // Load all scripts on this server
+                    var incr = await incrementWithExpire.LoadAsync(server).AnyContext();
+                    var remove = await removeIfEqual.LoadAsync(server).AnyContext();
+                    var replace = await replaceIfEqual.LoadAsync(server).AnyContext();
+                    var setHigher = await setIfHigher.LoadAsync(server).AnyContext();
+                    var setLower = await setIfLower.LoadAsync(server).AnyContext();
+                    var getAllExp = await getAllExpiration.LoadAsync(server).AnyContext();
+                    var setAllExp = await setAllExpiration.LoadAsync(server).AnyContext();
+
+                    return (incr, remove, replace, setHigher, setLower, getAllExp, setAllExp);
+                });
+
+                loadTasks.Add(loadTask);
             }
+
+            // Wait for any server to complete loading its scripts
+            // All should produce identical SHA hashes, so we only need one result
+            var completedTask = await Task.WhenAny(loadTasks).AnyContext();
+            var scripts = await completedTask.AnyContext();
+
+            // Continue loading on other servers in the background (required for Redis Cluster)
+            // but don't wait for them to finish - the scripts are available immediately
+            // once loaded on at least one node
+
+            // Assign the results to the instance fields
+            _incrementWithExpire = scripts.IncrementWithExpire;
+            _removeIfEqual = scripts.RemoveIfEqual;
+            _replaceIfEqual = scripts.ReplaceIfEqual;
+            _setIfHigher = scripts.SetIfHigher;
+            _setIfLower = scripts.SetIfLower;
+            _getAllExpiration = scripts.GetAllExpiration;
+            _setAllExpiration = scripts.SetAllExpiration;
 
             _scriptsLoaded = true;
         }
@@ -722,4 +923,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     private static readonly string ReplaceIfEqualScript = EmbeddedResourceLoader.GetEmbeddedResource("Foundatio.Redis.Scripts.ReplaceIfEqual.lua");
     private static readonly string SetIfHigherScript = EmbeddedResourceLoader.GetEmbeddedResource("Foundatio.Redis.Scripts.SetIfHigher.lua");
     private static readonly string SetIfLowerScript = EmbeddedResourceLoader.GetEmbeddedResource("Foundatio.Redis.Scripts.SetIfLower.lua");
+    private static readonly string GetAllExpirationScript = EmbeddedResourceLoader.GetEmbeddedResource("Foundatio.Redis.Scripts.GetAllExpiration.lua");
+    private static readonly string SetAllExpirationScript = EmbeddedResourceLoader.GetEmbeddedResource("Foundatio.Redis.Scripts.SetAllExpiration.lua");
 }
+
