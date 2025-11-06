@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Foundatio.AsyncEx;
 using Foundatio.Extensions;
@@ -104,7 +107,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                     await foreach (var key in server.KeysAsync(_options.Database).ConfigureAwait(false))
                         seen.Add(key);
 
-                    foreach (var batch in seen.Batch(batchSize))
+                    foreach (var batch in seen.Chunk(batchSize))
                         deleted += await Database.KeyDeleteAsync(batch.ToArray()).AnyContext();
                 }
                 catch (Exception ex)
@@ -115,25 +118,28 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         }
         else if (Database.Multiplexer.IsCluster())
         {
-            foreach (var redisKeys in keys.Where(k => !String.IsNullOrEmpty(k)).Select(k => (RedisKey)k).Batch(batchSize))
+            foreach (var redisKeys in keys.Where(k => !String.IsNullOrEmpty(k)).Select(k => (RedisKey)k).Chunk(batchSize))
             {
-                foreach (var hashSlotGroup in redisKeys.GroupBy(k => Database.Multiplexer.HashSlot(k)))
-                {
-                    var hashSlotKeys = hashSlotGroup.ToArray();
-                    try
+                await Parallel.ForEachAsync(
+                    redisKeys.GroupBy(k => Database.Multiplexer.HashSlot(k)),
+                    async (hashSlotGroup, ct) =>
                     {
-                        deleted += await Database.KeyDeleteAsync(hashSlotKeys).AnyContext();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Unable to delete {HashSlot} keys ({Keys}): {Message}", hashSlotGroup.Key, hashSlotKeys, ex.Message);
-                    }
-                }
+                        var hashSlotKeys = hashSlotGroup.ToArray();
+                        try
+                        {
+                            long count = await Database.KeyDeleteAsync(hashSlotKeys).AnyContext();
+                            Interlocked.Add(ref deleted, count);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Unable to delete {HashSlot} keys ({Keys}): {Message}", hashSlotGroup.Key, hashSlotKeys, ex.Message);
+                        }
+                    }).AnyContext();
             }
         }
         else
         {
-            foreach (var redisKeys in keys.Where(k => !String.IsNullOrEmpty(k)).Select(k => (RedisKey)k).Batch(batchSize))
+            foreach (var redisKeys in keys.Where(k => !String.IsNullOrEmpty(k)).Select(k => (RedisKey)k).Chunk(batchSize))
             {
                 try
                 {
@@ -176,8 +182,13 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             {
                 if (isCluster)
                 {
-                    foreach (var slotGroup in keys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
-                        deleted += await Database.KeyDeleteAsync(slotGroup.ToArray()).AnyContext();
+                    await Parallel.ForEachAsync(
+                        keys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)),
+                        async (slotGroup, ct) =>
+                        {
+                            long count = await Database.KeyDeleteAsync(slotGroup.ToArray()).AnyContext();
+                            Interlocked.Add(ref deleted, count);
+                        }).AnyContext();
                 }
                 else
                 {
@@ -252,28 +263,40 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             throw new ArgumentNullException(nameof(keys));
 
         var redisKeys = keys.Distinct().Select(k => (RedisKey)k).ToArray();
-        var result = new Dictionary<string, CacheValue<T>>(redisKeys.Length);
         if (redisKeys.Length == 0)
-            return result;
+            return ReadOnlyDictionary<string, CacheValue<T>>.Empty;
 
         if (_options.ConnectionMultiplexer.IsCluster())
         {
-            foreach (var hashSlotGroup in redisKeys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
-            {
-                var hashSlotKeys = hashSlotGroup.ToArray();
-                var values = await Database.StringGetAsync(hashSlotKeys, _options.ReadMode).AnyContext();
-                for (int i = 0; i < hashSlotKeys.Length; i++)
-                    result[hashSlotKeys[i]] = RedisValueToCacheValue<T>(values[i]);
-            }
+            // Use the default concurrency on .NET 8 (-1)
+            var result = new ConcurrentDictionary<string, CacheValue<T>>(-1, redisKeys.Length);
+            await Parallel.ForEachAsync(
+                redisKeys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)),
+                async (hashSlotGroup, ct) =>
+                {
+                    var hashSlotKeys = hashSlotGroup.ToArray();
+                    var values = await Database.StringGetAsync(hashSlotKeys, _options.ReadMode).AnyContext();
+
+                    // Redis MGET guarantees that values are returned in the same order as keys.
+                    // Non-existent keys return nil/empty values in their respective positions.
+                    // https://redis.io/commands/mget
+                    for (int i = 0; i < hashSlotKeys.Length; i++)
+                        result[hashSlotKeys[i]] = RedisValueToCacheValue<T>(values[i]);
+                }).AnyContext();
+
+            return result.AsReadOnly();
         }
         else
         {
+            var result = new Dictionary<string, CacheValue<T>>(redisKeys.Length);
             var values = await Database.StringGetAsync(redisKeys, _options.ReadMode).AnyContext();
+
+            // Redis MGET guarantees that values are returned in the same order as keys
             for (int i = 0; i < redisKeys.Length; i++)
                 result[redisKeys[i]] = RedisValueToCacheValue<T>(values[i]);
-        }
 
-        return result;
+            return result.AsReadOnly();
+        }
     }
 
     public async Task<CacheValue<ICollection<T>>> GetListAsync<T>(string key, int? page = null, int pageSize = 100)
