@@ -39,15 +39,17 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task AddAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task AddAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.AddAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.AddAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
-    [Fact]
-    public override Task AddAsync_WithExistingKey_ReturnsFalseAndPreservesValue()
+    [Theory]
+    [InlineData("user:profile")]
+    [InlineData("   ")]
+    public override Task AddAsync_WithExistingKey_ReturnsFalseAndPreservesValue(string cacheKey)
     {
-        return base.AddAsync_WithExistingKey_ReturnsFalseAndPreservesValue();
+        return base.AddAsync_WithExistingKey_ReturnsFalseAndPreservesValue(cacheKey);
     }
 
     [Fact(Skip = "TODO: Look into this as the local cache client maintenance never schedules for expiration")]
@@ -62,10 +64,12 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.AddAsync_WithNestedKeyUsingSeparator_StoresCorrectly();
     }
 
-    [Fact]
-    public override Task AddAsync_WithNewKey_ReturnsTrue()
+    [Theory]
+    [InlineData("user:profile")]
+    [InlineData("   ")]
+    public override Task AddAsync_WithValidKey_ReturnsTrue(string cacheKey)
     {
-        return base.AddAsync_WithNewKey_ReturnsTrue();
+        return base.AddAsync_WithValidKey_ReturnsTrue(cacheKey);
     }
 
     [Fact]
@@ -73,13 +77,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.AddAsync_WithNullKey_ThrowsArgumentNullException();
     }
-
-    [Fact]
-    public override Task AddAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.AddAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task CacheOperations_WithMultipleTypes_MeasuresThroughput()
     {
@@ -105,15 +102,17 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task ExistsAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task ExistsAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.ExistsAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.ExistsAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
-    [Fact]
-    public override Task ExistsAsync_WithExistingKey_ReturnsTrue()
+    [Theory]
+    [InlineData("user:profile")]
+    [InlineData("   ")]
+    public override Task ExistsAsync_WithExistingKey_ReturnsTrue(string cacheKey)
     {
-        return base.ExistsAsync_WithExistingKey_ReturnsTrue();
+        return base.ExistsAsync_WithExistingKey_ReturnsTrue(cacheKey);
     }
 
     [Fact]
@@ -151,23 +150,18 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.ExistsAsync_WithScopedCache_ChecksOnlyWithinScope();
     }
-
-    [Fact]
-    public override Task ExistsAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.ExistsAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task GetAllAsync_WithEmptyKeys_ReturnsEmpty()
     {
         return base.GetAllAsync_WithEmptyKeys_ReturnsEmpty();
     }
 
-    [Fact]
-    public override Task GetAllAsync_WithExistingKeys_ReturnsAllValues()
+    [Theory]
+    [InlineData("test2")]
+    [InlineData("   ")]
+    public override Task GetAllAsync_WithExistingKeys_ReturnsAllValues(string cacheKey)
     {
-        return base.GetAllAsync_WithExistingKeys_ReturnsAllValues();
+        return base.GetAllAsync_WithExistingKeys_ReturnsAllValues(cacheKey);
     }
 
     [Fact]
@@ -177,15 +171,9 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task GetAllAsync_WithKeysContainingNull_ThrowsArgumentException()
+    public override Task GetAllAsync_WithKeysContainingNull_ThrowsArgumentNullException()
     {
-        return base.GetAllAsync_WithKeysContainingNull_ThrowsArgumentException();
-    }
-
-    [Fact]
-    public override Task GetAllAsync_WithKeysContainingWhitespace_ThrowsArgumentException()
-    {
-        return base.GetAllAsync_WithKeysContainingWhitespace_ThrowsArgumentException();
+        return base.GetAllAsync_WithKeysContainingNull_ThrowsArgumentNullException();
     }
 
     [Fact]
@@ -262,10 +250,12 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.GetAsync_WithComplexObject_PreservesAllProperties();
     }
 
-    [Fact]
-    public override Task GetAsync_WithComplexObject_ReturnsNewInstance()
+    [Theory]
+    [InlineData("order:details")]
+    [InlineData("   ")]
+    public override Task GetAsync_WithComplexObject_ReturnsNewInstance(string cacheKey)
     {
-        return base.GetAsync_WithComplexObject_ReturnsNewInstance();
+        return base.GetAsync_WithComplexObject_ReturnsNewInstance(cacheKey);
     }
 
     [Fact]
@@ -275,9 +265,9 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task GetAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task GetAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.GetAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.GetAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
     [Fact]
@@ -333,13 +323,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.GetAsync_WithTryGetSemanticsAndMaxLongAsInt_ReturnsNoValue();
     }
-
-    [Fact]
-    public override Task GetAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.GetAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task GetExpirationAsync_AfterExpiry_ReturnsNull()
     {
@@ -353,15 +336,17 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task GetExpirationAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task GetExpirationAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.GetExpirationAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.GetExpirationAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
-    [Fact]
-    public override Task GetExpirationAsync_WithExpiration_ReturnsCorrectTimeSpan()
+    [Theory]
+    [InlineData("token:refresh")]
+    [InlineData("   ")]
+    public override Task GetExpirationAsync_WithExpiration_ReturnsCorrectTimeSpan(string cacheKey)
     {
-        return base.GetExpirationAsync_WithExpiration_ReturnsCorrectTimeSpan();
+        return base.GetExpirationAsync_WithExpiration_ReturnsCorrectTimeSpan(cacheKey);
     }
 
     [Fact]
@@ -393,17 +378,10 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.GetExpirationAsync_WithNullKey_ThrowsArgumentNullException();
     }
-
     [Fact]
-    public override Task GetExpirationAsync_WithWhitespaceKey_ThrowsArgumentException()
+    public override Task GetListAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.GetExpirationAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
-    [Fact]
-    public override Task GetListAsync_WithEmptyKey_ThrowsArgumentNullException()
-    {
-        return base.GetListAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.GetListAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
     [Fact]
@@ -442,18 +420,13 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.GetListAsync_WithPageBeyondEnd_ReturnsEmptyCollection();
     }
 
-    [Fact]
-    public override Task GetListAsync_WithPaging_ReturnsCorrectPageSize()
+    [Theory]
+    [InlineData("cart:items")]
+    [InlineData("   ")]
+    public override Task GetListAsync_WithPaging_ReturnsCorrectPageSize(string cacheKey)
     {
-        return base.GetListAsync_WithPaging_ReturnsCorrectPageSize();
+        return base.GetListAsync_WithPaging_ReturnsCorrectPageSize(cacheKey);
     }
-
-    [Fact]
-    public override Task GetListAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.GetListAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task GetUnixTimeMillisecondsAsync_WithLocalDateTime_ReturnsCorrectly()
     {
@@ -479,15 +452,17 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task IncrementAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task IncrementAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.IncrementAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.IncrementAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
-    [Fact]
-    public override Task IncrementAsync_WithExistingKey_IncrementsValue()
+    [Theory]
+    [InlineData("metrics:page-views")]
+    [InlineData("   ")]
+    public override Task IncrementAsync_WithExistingKey_IncrementsValue(string cacheKey)
     {
-        return base.IncrementAsync_WithExistingKey_IncrementsValue();
+        return base.IncrementAsync_WithExistingKey_IncrementsValue(cacheKey);
     }
 
     [Fact]
@@ -519,23 +494,18 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.IncrementAsync_WithSpecifiedAmount_IncrementsCorrectly();
     }
-
-    [Fact]
-    public override Task IncrementAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.IncrementAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task ListAddAsync_WithDifferentCasedKeys_MaintainsDistinctLists()
     {
         return base.ListAddAsync_WithDifferentCasedKeys_MaintainsDistinctLists();
     }
 
-    [Fact]
-    public override Task ListAddAsync_WithDuplicates_RemovesDuplicatesAndAddsItems()
+    [Theory]
+    [InlineData("cart:items")]
+    [InlineData("   ")]
+    public override Task ListAddAsync_WithDuplicates_RemovesDuplicatesAndAddsItems(string cacheKey)
     {
-        return base.ListAddAsync_WithDuplicates_RemovesDuplicatesAndAddsItems();
+        return base.ListAddAsync_WithDuplicates_RemovesDuplicatesAndAddsItems(cacheKey);
     }
 
     [Fact]
@@ -551,9 +521,9 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task ListAddAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task ListAddAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.ListAddAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.ListAddAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
     [Fact]
@@ -615,23 +585,18 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.ListAddAsync_WithSingleString_StoresAsStringNotCharArray();
     }
-
     [Fact]
-    public override Task ListAddAsync_WithWhitespaceKey_ThrowsArgumentException()
+    public override Task ListRemoveAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.ListAddAsync_WithWhitespaceKey_ThrowsArgumentException();
+        return base.ListRemoveAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
-    [Fact]
-    public override Task ListRemoveAsync_WithEmptyKey_ThrowsArgumentNullException()
+    [Theory]
+    [InlineData("cart:items")]
+    [InlineData("   ")]
+    public override Task ListRemoveAsync_WithMultipleValues_RemovesAll(string cacheKey)
     {
-        return base.ListRemoveAsync_WithEmptyKey_ThrowsArgumentNullException();
-    }
-
-    [Fact]
-    public override Task ListRemoveAsync_WithMultipleValues_RemovesAll()
-    {
-        return base.ListRemoveAsync_WithMultipleValues_RemovesAll();
+        return base.ListRemoveAsync_WithMultipleValues_RemovesAll(cacheKey);
     }
 
     [Fact]
@@ -669,13 +634,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.ListRemoveAsync_WithValidValues_RemovesKeyWhenEmpty();
     }
-
-    [Fact]
-    public override Task ListRemoveAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.ListRemoveAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task RemoveAllAsync_WithEmptyKeys_Succeeds()
     {
@@ -689,15 +647,9 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task RemoveAllAsync_WithKeysContainingNull_ThrowsArgumentException()
+    public override Task RemoveAllAsync_WithKeysContainingNull_ThrowsArgumentNullException()
     {
-        return base.RemoveAllAsync_WithKeysContainingNull_ThrowsArgumentException();
-    }
-
-    [Fact]
-    public override Task RemoveAllAsync_WithKeysContainingWhitespace_ThrowsArgumentException()
-    {
-        return base.RemoveAllAsync_WithKeysContainingWhitespace_ThrowsArgumentException();
+        return base.RemoveAllAsync_WithKeysContainingNull_ThrowsArgumentNullException();
     }
 
     [Fact]
@@ -719,9 +671,9 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task RemoveAllAsync_WithNullKeys_ThrowsArgumentNullException()
+    public override Task RemoveAllAsync_WithNullKeys_RemovesAllValues()
     {
-        return base.RemoveAllAsync_WithNullKeys_ThrowsArgumentNullException();
+        return base.RemoveAllAsync_WithNullKeys_RemovesAllValues();
     }
 
     [Fact]
@@ -730,10 +682,12 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.RemoveAllAsync_WithScopedCache_AffectsOnlyScopedKeys();
     }
 
-    [Fact]
-    public override Task RemoveAllAsync_WithSpecificKeyCollection_RemovesOnlySpecifiedKeys()
+    [Theory]
+    [InlineData("remove-all-keys:")]
+    [InlineData("   ")]
+    public override Task RemoveAllAsync_WithSpecificKeyCollection_RemovesOnlySpecifiedKeys(string keyPrefix)
     {
-        return base.RemoveAllAsync_WithSpecificKeyCollection_RemovesOnlySpecifiedKeys();
+        return base.RemoveAllAsync_WithSpecificKeyCollection_RemovesOnlySpecifiedKeys(keyPrefix);
     }
 
     [Fact]
@@ -749,15 +703,17 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task RemoveAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task RemoveAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.RemoveAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.RemoveAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
-    [Fact]
-    public override Task RemoveAsync_WithExistingKey_RemovesSuccessfully()
+    [Theory]
+    [InlineData("session:active")]
+    [InlineData("   ")]
+    public override Task RemoveAsync_WithExistingKey_RemovesSuccessfully(string cacheKey)
     {
-        return base.RemoveAsync_WithExistingKey_RemovesSuccessfully();
+        return base.RemoveAsync_WithExistingKey_RemovesSuccessfully(cacheKey);
     }
 
     [Fact]
@@ -795,13 +751,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.RemoveAsync_WithSpecificCase_RemovesOnlyMatchingKey();
     }
-
-    [Fact]
-    public override Task RemoveAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.RemoveAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task RemoveByPrefixAsync_AsteriskPrefixWithScopedCache_TreatedAsLiteral()
     {
@@ -809,13 +758,13 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Theory]
-    [InlineData("snowboard", 1, true)] // Exact key match
-    [InlineData("s", 1, true)] // Partial prefix match
-    [InlineData(null, 1, false)] // Null prefix (all keys in scope)
-    [InlineData("", 1, false)] // Empty prefix (all keys in scope)
-    public override Task RemoveByPrefixAsync_FromScopedCache_RemovesOnlyScopedKeys(string prefixToRemove, int expectedRemovedCount, bool shouldUnscopedRemain)
+    [InlineData("snowboard", 1)] // Exact key match
+    [InlineData("s", 1)] // Partial prefix match
+    [InlineData(null, 1)] // Null prefix (all keys in scope)
+    [InlineData("", 1)] // Empty prefix (all keys in scope)
+    public override Task RemoveByPrefixAsync_FromScopedCache_RemovesOnlyScopedKeys(string prefixToRemove, int expectedRemovedCount)
     {
-        return base.RemoveByPrefixAsync_FromScopedCache_RemovesOnlyScopedKeys(prefixToRemove, expectedRemovedCount, shouldUnscopedRemain);
+        return base.RemoveByPrefixAsync_FromScopedCache_RemovesOnlyScopedKeys(prefixToRemove, expectedRemovedCount);
     }
 
     [Theory]
@@ -856,12 +805,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.RemoveByPrefixAsync_WithEmptyPrefix_RemovesAllKeys();
     }
 
-    [Fact]
-    public override Task RemoveByPrefixAsync_WithEmptyPrefix_ThrowsArgumentException()
-    {
-        return base.RemoveByPrefixAsync_WithEmptyPrefix_ThrowsArgumentException();
-    }
-
     [Theory]
     [MemberData(nameof(GetLineEndingPrefixes))]
     public override Task RemoveByPrefixAsync_WithLineEndingPrefix_TreatsAsLiteral(string lineEndingPrefix)
@@ -875,10 +818,12 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.RemoveByPrefixAsync_WithLocalCache_InvalidatesLocalCache();
     }
 
-    [Fact]
-    public override Task RemoveByPrefixAsync_WithMatchingPrefix_RemovesOnlyPrefixedKeys()
+    [Theory]
+    [InlineData("blah:")]
+    [InlineData("   ")]
+    public override Task RemoveByPrefixAsync_WithMatchingPrefix_RemovesOnlyPrefixedKeys(string prefix)
     {
-        return base.RemoveByPrefixAsync_WithMatchingPrefix_RemovesOnlyPrefixedKeys();
+        return base.RemoveByPrefixAsync_WithMatchingPrefix_RemovesOnlyPrefixedKeys(prefix);
     }
 
     [Theory]
@@ -903,12 +848,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.RemoveByPrefixAsync_WithNullPrefix_RemovesAllKeys();
     }
 
-    [Fact]
-    public override Task RemoveByPrefixAsync_WithNullPrefix_ThrowsArgumentNullException()
-    {
-        return base.RemoveByPrefixAsync_WithNullPrefix_ThrowsArgumentNullException();
-    }
-
     [Theory]
     [MemberData(nameof(GetRegexSpecialCharacters))]
     public override Task RemoveByPrefixAsync_WithRegexMetacharacter_TreatsAsLiteral(string specialChar)
@@ -929,19 +868,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.RemoveByPrefixAsync_WithSpecialCharacterPrefix_TreatsAsLiteral(specialPrefix);
     }
 
-    [Fact]
-    public override Task RemoveByPrefixAsync_WithWhitespacePrefix_ThrowsArgumentException()
-    {
-        return base.RemoveByPrefixAsync_WithWhitespacePrefix_ThrowsArgumentException();
-    }
-
-    [Theory]
-    [MemberData(nameof(GetWhitespaceOnlyPrefixes))]
-    public override Task RemoveByPrefixAsync_WithWhitespacePrefix_TreatsAsLiteral(string whitespacePrefix)
-    {
-        return base.RemoveByPrefixAsync_WithWhitespacePrefix_TreatsAsLiteral(whitespacePrefix);
-    }
-
     [Theory]
     [MemberData(nameof(GetWildcardPatterns))]
     public override Task RemoveByPrefixAsync_WithWildcardPattern_TreatsAsLiteral(string pattern)
@@ -950,15 +876,17 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task RemoveIfEqualAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task RemoveIfEqualAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.RemoveIfEqualAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.RemoveIfEqualAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
-    [Fact]
-    public override Task RemoveIfEqualAsync_WithMatchingValue_ReturnsTrueAndRemoves()
+    [Theory]
+    [InlineData("session:active")]
+    [InlineData("   ")]
+    public override Task RemoveIfEqualAsync_WithMatchingValue_ReturnsTrueAndRemoves(string cacheKey)
     {
-        return base.RemoveIfEqualAsync_WithMatchingValue_ReturnsTrueAndRemoves();
+        return base.RemoveIfEqualAsync_WithMatchingValue_ReturnsTrueAndRemoves(cacheKey);
     }
 
     [Fact]
@@ -972,13 +900,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.RemoveIfEqualAsync_WithNullKey_ThrowsArgumentNullException();
     }
-
-    [Fact]
-    public override Task RemoveIfEqualAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.RemoveIfEqualAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task ReplaceAsync_WithDifferentCasedKeys_TreatsAsDifferentKeys()
     {
@@ -986,15 +907,17 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task ReplaceAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task ReplaceAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.ReplaceAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.ReplaceAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
-    [Fact]
-    public override Task ReplaceAsync_WithExistingKey_ReturnsTrueAndReplacesValue()
+    [Theory]
+    [InlineData("settings:theme")]
+    [InlineData("   ")]
+    public override Task ReplaceAsync_WithExistingKey_ReturnsTrueAndReplacesValue(string cacheKey)
     {
-        return base.ReplaceAsync_WithExistingKey_ReturnsTrueAndReplacesValue();
+        return base.ReplaceAsync_WithExistingKey_ReturnsTrueAndReplacesValue(cacheKey);
     }
 
     [Fact]
@@ -1014,13 +937,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.ReplaceAsync_WithNullKey_ThrowsArgumentNullException();
     }
-
-    [Fact]
-    public override Task ReplaceAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.ReplaceAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task ReplaceIfEqualAsync_WithDifferentCasedKeys_ReplacesOnlyExactMatch()
     {
@@ -1028,9 +944,9 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task ReplaceIfEqualAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task ReplaceIfEqualAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.ReplaceIfEqualAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.ReplaceIfEqualAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
     [Fact]
@@ -1039,10 +955,12 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.ReplaceIfEqualAsync_WithExpiration_SetsExpirationCorrectly();
     }
 
-    [Fact]
-    public override Task ReplaceIfEqualAsync_WithMatchingOldValue_ReturnsTrueAndReplacesValue()
+    [Theory]
+    [InlineData("workflow:state")]
+    [InlineData("   ")]
+    public override Task ReplaceIfEqualAsync_WithMatchingOldValue_ReturnsTrueAndReplacesValue(string cacheKey)
     {
-        return base.ReplaceIfEqualAsync_WithMatchingOldValue_ReturnsTrueAndReplacesValue();
+        return base.ReplaceIfEqualAsync_WithMatchingOldValue_ReturnsTrueAndReplacesValue(cacheKey);
     }
 
     [Fact]
@@ -1056,13 +974,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.ReplaceIfEqualAsync_WithNullKey_ThrowsArgumentNullException();
     }
-
-    [Fact]
-    public override Task ReplaceIfEqualAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.ReplaceIfEqualAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task Serialization_WithComplexObjectsAndValidation_MeasuresThroughput()
     {
@@ -1093,28 +1004,18 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.SetAllAsync_WithEmptyItems_ReturnsTrue();
     }
 
-    [Fact]
-    public override Task SetAllAsync_WithExpiration_KeysExpireCorrectly()
+    [Theory]
+    [InlineData("test")]
+    [InlineData("   ")]
+    public override Task SetAllAsync_WithExpiration_KeysExpireCorrectly(string cacheKey)
     {
-        return base.SetAllAsync_WithExpiration_KeysExpireCorrectly();
+        return base.SetAllAsync_WithExpiration_KeysExpireCorrectly(cacheKey);
     }
 
     [Fact]
     public override Task SetAllAsync_WithItemsContainingEmptyKey_ThrowsArgumentException()
     {
         return base.SetAllAsync_WithItemsContainingEmptyKey_ThrowsArgumentException();
-    }
-
-    [Fact]
-    public override Task SetAllAsync_WithItemsContainingNullKey_ThrowsArgumentException()
-    {
-        return base.SetAllAsync_WithItemsContainingNullKey_ThrowsArgumentException();
-    }
-
-    [Fact]
-    public override Task SetAllAsync_WithItemsContainingWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.SetAllAsync_WithItemsContainingWhitespaceKey_ThrowsArgumentException();
     }
 
     [Fact]
@@ -1149,10 +1050,12 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
         return base.SetAllExpiration_WithNullValues_RemovesExpiration();
     }
 
-    [Fact]
-    public override Task SetAsync_WithComplexObject_StoresCorrectly()
+    [Theory]
+    [InlineData("user:profile")]
+    [InlineData("   ")]
+    public override Task SetAsync_WithComplexObject_StoresCorrectly(string cacheKey)
     {
-        return base.SetAsync_WithComplexObject_StoresCorrectly();
+        return base.SetAsync_WithComplexObject_StoresCorrectly(cacheKey);
     }
 
     [Fact]
@@ -1174,9 +1077,9 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task SetAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task SetAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.SetAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.SetAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
     [Fact]
@@ -1232,17 +1135,12 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.SetAsync_WithShortExpiration_ExpiresCorrectly();
     }
-
-    [Fact]
-    public override Task SetAsync_WithWhitespaceKey_ThrowsArgumentException()
+    [Theory]
+    [InlineData("token:refresh")]
+    [InlineData("   ")]
+    public override Task SetExpirationAsync_ChangingFromNoExpirationToFutureTime_UpdatesCorrectly(string cacheKey)
     {
-        return base.SetAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
-    [Fact]
-    public override Task SetExpirationAsync_ChangingFromNoExpirationToFutureTime_UpdatesCorrectly()
-    {
-        return base.SetExpirationAsync_ChangingFromNoExpirationToFutureTime_UpdatesCorrectly();
+        return base.SetExpirationAsync_ChangingFromNoExpirationToFutureTime_UpdatesCorrectly(cacheKey);
     }
 
     [Fact]
@@ -1276,9 +1174,9 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task SetExpirationAsync_WithEmptyKey_ThrowsArgumentNullException()
+    public override Task SetExpirationAsync_WithEmptyKey_ThrowsArgumentException()
     {
-        return base.SetExpirationAsync_WithEmptyKey_ThrowsArgumentNullException();
+        return base.SetExpirationAsync_WithEmptyKey_ThrowsArgumentException();
     }
 
     [Fact]
@@ -1286,13 +1184,6 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.SetExpirationAsync_WithNullKey_ThrowsArgumentNullException();
     }
-
-    [Fact]
-    public override Task SetExpirationAsync_WithWhitespaceKey_ThrowsArgumentException()
-    {
-        return base.SetExpirationAsync_WithWhitespaceKey_ThrowsArgumentException();
-    }
-
     [Fact]
     public override Task SetIfHigherAsync_WithDateTime_DoesNotUpdateWhenLower()
     {
