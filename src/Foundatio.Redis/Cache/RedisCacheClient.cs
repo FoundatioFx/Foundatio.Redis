@@ -609,7 +609,8 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
     public async Task<int> SetAllAsync<T>(IDictionary<string, T> values, TimeSpan? expiresIn = null)
     {
-        if (values == null || values.Count == 0)
+        ArgumentNullException.ThrowIfNull(values);
+        if (values.Count is 0)
             return 0;
 
         if (expiresIn?.Ticks <= 0)
