@@ -124,11 +124,11 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                         await foreach (var key in server.KeysAsync(_options.Database).ConfigureAwait(false))
                             seen.Add(key);
 
-                    // Parallelize batch deletions with moderate concurrency to avoid Redis overload
-                    // Redis can become unstable with too many concurrent connections/requests
-                    // See: https://redis.io/docs/reference/clients/
-                    // Lower limit (8) since this runs after FLUSHDB failed, meaning we're deleting
-                    // potentially thousands or millions of keys - must avoid overwhelming Redis
+                        // Parallelize batch deletions with moderate concurrency to avoid Redis overload
+                        // Redis can become unstable with too many concurrent connections/requests
+                        // See: https://redis.io/docs/reference/clients/
+                        // Lower limit (8) since this runs after FLUSHDB failed, meaning we're deleting
+                        // potentially thousands or millions of keys - must avoid overwhelming Redis
                         int maxParallelism = Math.Min(8, Environment.ProcessorCount);
                         await Parallel.ForEachAsync(seen.Chunk(batchSize), new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, async (batch, ct) =>
                         {
@@ -145,10 +145,20 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         }
         else if (Database.Multiplexer.IsCluster())
         {
-            foreach (var redisKeys in keys.Where(k => !String.IsNullOrEmpty(k)).Select(k => (RedisKey)k).Chunk(batchSize))
+            var redisKeys = keys is ICollection<string> collection ? new List<RedisKey>(collection.Count) : [];
+            foreach (string key in keys.Distinct())
+            {
+                ArgumentException.ThrowIfNullOrEmpty(key, nameof(keys));
+                redisKeys.Add(key);
+            }
+
+            if (redisKeys.Count is 0)
+                return 0;
+
+            foreach (var batch in redisKeys.Chunk(batchSize))
             {
                 await Parallel.ForEachAsync(
-                    redisKeys.GroupBy(k => Database.Multiplexer.HashSlot(k)),
+                    batch.GroupBy(k => Database.Multiplexer.HashSlot(k)),
                     async (hashSlotGroup, ct) =>
                     {
                         var hashSlotKeys = hashSlotGroup.ToArray();
@@ -166,24 +176,31 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         }
         else
         {
-            var keyBatches = keys.Where(k => !String.IsNullOrEmpty(k))
-                .Select(k => (RedisKey)k)
-                .Chunk(batchSize)
-                .ToArray();
+            var redisKeys = keys is ICollection<string> collection ? new List<RedisKey>(collection.Count) : [];
+            foreach (string key in keys.Distinct())
+            {
+                ArgumentException.ThrowIfNullOrEmpty(key, nameof(keys));
+                redisKeys.Add(key);
+            }
+
+            if (redisKeys.Count is 0)
+                return 0;
+
+            var keyBatches = redisKeys.Chunk(batchSize).ToArray();
 
             // Parallelize batch deletions with moderate concurrency to avoid Redis overload
             // Limit parallelism to 8 or Environment.ProcessorCount, whichever is smaller
             int maxParallelism = Math.Min(8, Environment.ProcessorCount);
-            await Parallel.ForEachAsync(keyBatches, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, async (redisKeys, ct) =>
+            await Parallel.ForEachAsync(keyBatches, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, async (batch, ct) =>
             {
                 try
                 {
-                    long count = await Database.KeyDeleteAsync(redisKeys).AnyContext();
+                    long count = await Database.KeyDeleteAsync(batch).AnyContext();
                     Interlocked.Add(ref deleted, count);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Unable to delete keys ({Keys}): {Message}", redisKeys, ex.Message);
+                    _logger.LogError(ex, "Unable to delete keys ({Keys}): {Message}", batch, ex.Message);
                 }
             }).AnyContext();
         }
@@ -331,11 +348,11 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         }
         else
         {
-            var result = new Dictionary<string, CacheValue<T>>(redisKeys.Length);
-            var values = await Database.StringGetAsync(redisKeys, _options.ReadMode).AnyContext();
+            var result = new Dictionary<string, CacheValue<T>>(redisKeys.Count);
+            var values = await Database.StringGetAsync(redisKeys.ToArray(), _options.ReadMode).AnyContext();
 
             // Redis MGET guarantees that values are returned in the same order as keys
-            for (int i = 0; i < redisKeys.Length; i++)
+            for (int i = 0; i < redisKeys.Count; i++)
                 result[redisKeys[i]] = RedisValueToCacheValue<T>(values[i]);
 
             return result.AsReadOnly();
@@ -602,6 +619,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             return 0;
         }
 
+        // TODO: Look into optimizing this.
         var tasks = new List<Task<bool>>();
         foreach (var pair in values)
         {
