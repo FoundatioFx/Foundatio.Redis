@@ -599,7 +599,10 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         var tasks = new List<Task<bool>>();
         foreach (var pair in values)
+        {
+            ArgumentException.ThrowIfNullOrEmpty(pair.Key, nameof(values));
             tasks.Add(Database.StringSetAsync(pair.Key, pair.Value.ToRedisValue(_options.Serializer), expiresIn));
+        }
 
         bool[] results = await Task.WhenAll(tasks).AnyContext();
         return results.Count(r => r);
