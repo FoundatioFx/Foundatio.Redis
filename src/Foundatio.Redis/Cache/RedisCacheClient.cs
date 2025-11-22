@@ -297,17 +297,22 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
     public async Task<IDictionary<string, CacheValue<T>>> GetAllAsync<T>(IEnumerable<string> keys)
     {
-        if (keys is null)
-            throw new ArgumentNullException(nameof(keys));
+        ArgumentNullException.ThrowIfNull(keys);
 
-        var redisKeys = keys.Distinct().Select(k => (RedisKey)k).ToArray();
-        if (redisKeys.Length == 0)
+        var redisKeys = keys is ICollection<string> collection ? new List<RedisKey>(collection.Count) : [];
+        foreach (string key in keys.Distinct())
+        {
+            ArgumentException.ThrowIfNullOrEmpty(key, nameof(keys));
+            redisKeys.Add(key);
+        }
+
+        if (redisKeys.Count is 0)
             return ReadOnlyDictionary<string, CacheValue<T>>.Empty;
 
         if (_options.ConnectionMultiplexer.IsCluster())
         {
             // Use the default concurrency on .NET 8 (-1)
-            var result = new ConcurrentDictionary<string, CacheValue<T>>(-1, redisKeys.Length);
+            var result = new ConcurrentDictionary<string, CacheValue<T>>(-1, redisKeys.Count);
             await Parallel.ForEachAsync(
                 redisKeys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)),
                 async (hashSlotGroup, ct) =>
