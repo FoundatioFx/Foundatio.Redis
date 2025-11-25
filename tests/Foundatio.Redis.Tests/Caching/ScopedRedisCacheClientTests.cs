@@ -58,6 +58,7 @@ public class ScopedRedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     {
         return base.AddAsync_WithNullKey_ThrowsArgumentNullException();
     }
+
     [Fact(Skip = "Performance Test")]
     public override Task CacheOperations_WithMultipleTypes_MeasuresThroughput()
     {
@@ -125,6 +126,7 @@ public class ScopedRedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     {
         return base.ExistsAsync_WithScopedCache_ChecksOnlyWithinScope();
     }
+
     [Fact]
     public override Task GetAllAsync_WithEmptyKeys_ReturnsEmpty()
     {

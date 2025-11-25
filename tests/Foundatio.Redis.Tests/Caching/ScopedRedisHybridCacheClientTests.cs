@@ -77,6 +77,7 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.AddAsync_WithNullKey_ThrowsArgumentNullException();
     }
+
     [Fact]
     public override Task CacheOperations_WithMultipleTypes_MeasuresThroughput()
     {
@@ -150,6 +151,7 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     {
         return base.ExistsAsync_WithScopedCache_ChecksOnlyWithinScope();
     }
+
     [Fact]
     public override Task GetAllAsync_WithEmptyKeys_ReturnsEmpty()
     {
