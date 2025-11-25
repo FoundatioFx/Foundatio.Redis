@@ -124,11 +124,9 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                         await foreach (var key in server.KeysAsync(_options.Database).ConfigureAwait(false))
                             seen.Add(key);
 
-                        // Parallelize batch deletions with moderate concurrency to avoid Redis overload
-                        // Redis can become unstable with too many concurrent connections/requests
-                        // See: https://redis.io/docs/reference/clients/
-                        // Lower limit (8) since this runs after FLUSHDB failed, meaning we're deleting
-                        // potentially thousands or millions of keys - must avoid overwhelming Redis
+                        // NOTE: StackExchange.Redis multiplexes all operations over a single connection and handles
+                        // pipelining internally, so parallelism limits here only affect client-side Task creation,
+                        // not Redis server load. Consider simplifying to Task.WhenAll in a future refactor.
                         int maxParallelism = Math.Min(8, Environment.ProcessorCount);
                         await Parallel.ForEachAsync(seen.Chunk(batchSize), new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, async (batch, ct) =>
                         {
@@ -188,8 +186,9 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
             var keyBatches = redisKeys.Chunk(batchSize).ToArray();
 
-            // Parallelize batch deletions with moderate concurrency to avoid Redis overload
-            // Limit parallelism to 8 or Environment.ProcessorCount, whichever is smaller
+            // NOTE: StackExchange.Redis multiplexes all operations over a single connection and handles
+            // pipelining internally, so parallelism limits here only affect client-side Task creation,
+            // not Redis server load. Consider simplifying to Task.WhenAll in a future refactor.
             int maxParallelism = Math.Min(8, Environment.ProcessorCount);
             await Parallel.ForEachAsync(keyBatches, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, async (batch, ct) =>
             {
