@@ -835,7 +835,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         ArgumentNullException.ThrowIfNull(keys);
 
         var keyList = keys.Where(k => !String.IsNullOrEmpty(k)).Distinct().ToList();
-        if (keyList.Count == 0)
+        if (keyList.Count is 0)
             return ReadOnlyDictionary<string, TimeSpan?>.Empty;
 
         await LoadScriptsAsync().AnyContext();
@@ -850,19 +850,20 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 {
                     var hashSlotKeys = hashSlotGroup.Select(k => (RedisKey)k).ToArray();
                     var redisResult = await Database.ScriptEvaluateAsync(_getAllExpiration.Hash, hashSlotKeys).AnyContext();
-
                     if (redisResult.IsNull)
                         return;
 
                     // Lua script returns array of TTL values in milliseconds (in same order as keys)
                     // -2 = key doesn't exist, -1 = no expiration, positive = TTL in ms
-                    var ttls = (long[])redisResult;
-                    for (int i = 0; i < hashSlotKeys.Length; i++)
-                    {
-                        string key = hashSlotKeys[i];
-                        long ttl = ttls[i];
+                    long[] ttls = (long[])redisResult;
+                    if (ttls is null || ttls.Length != hashSlotKeys.Length)
+                        throw new ArgumentException("Hash slot count mismatch");
 
-                        if (ttl >= 0)  // Only include keys with positive TTL (exclude non-existent and persistent)
+                    for (int hashSlotIndex = 0; hashSlotIndex < hashSlotKeys.Length; hashSlotIndex++)
+                    {
+                        string key = hashSlotKeys[hashSlotIndex];
+                        long ttl = ttls[hashSlotIndex];
+                        if (ttl >= 0) // Only include keys with positive TTL (exclude non-existent and persistent)
                             result[key] = TimeSpan.FromMilliseconds(ttl);
                     }
                 }).AnyContext();
@@ -879,15 +880,16 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
             // Lua script returns array of TTL values in milliseconds (in same order as keys)
             // -2 = key doesn't exist, -1 = no expiration, positive = TTL in ms
-            var ttls = (long[])redisResult;
+            long[] ttls = (long[])redisResult;
+            if (ttls is null || ttls.Length != redisKeys.Length)
+                throw new ArgumentException("Hash slot count mismatch");
+
             var result = new Dictionary<string, TimeSpan?>();
-
-            for (int i = 0; i < redisKeys.Length; i++)
+            for (int keyIndex = 0; keyIndex < redisKeys.Length; keyIndex++)
             {
-                string key = redisKeys[i];
-                long ttl = ttls[i];
-
-                if (ttl >= 0)  // Only include keys with positive TTL (exclude non-existent and persistent)
+                string key = redisKeys[keyIndex];
+                long ttl = ttls[keyIndex];
+                if (ttl >= 0) // Only include keys with positive TTL (exclude non-existent and persistent)
                     result[key] = TimeSpan.FromMilliseconds(ttl);
             }
 
@@ -900,7 +902,6 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         ArgumentNullException.ThrowIfNull(expirations);
 
         var validExpirations = expirations.Where(kvp => !String.IsNullOrEmpty(kvp.Key)).ToList();
-
         if (validExpirations.Count == 0)
             return;
 
@@ -979,10 +980,6 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 LoadedLuaScript GetAllExpiration,
                 LoadedLuaScript SetAllExpiration)>>();
 
-            // Limit parallelism to Environment.ProcessorCount
-            int maxParallelism = Math.Min(Environment.ProcessorCount, endpoints.Length);
-            var options = new ParallelOptions { MaxDegreeOfParallelism = maxParallelism };
-
             // Start script loading tasks for all endpoints
             foreach (var server in endpoints)
             {
@@ -990,7 +987,8 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                     continue;
 
                 // Create and start task for this server - completely independent
-                var loadTask = Task.Run(async () => {
+                var loadTask = Task.Run(async () =>
+                {
                     // Load all scripts on this server
                     var incr = await incrementWithExpire.LoadAsync(server).AnyContext();
                     var remove = await removeIfEqual.LoadAsync(server).AnyContext();
