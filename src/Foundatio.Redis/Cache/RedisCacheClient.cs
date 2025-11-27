@@ -833,7 +833,13 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     {
         ArgumentNullException.ThrowIfNull(keys);
 
-        var keyList = keys.Where(k => !String.IsNullOrEmpty(k)).Distinct().ToList();
+        var keyList = keys is ICollection<string> collection ? new List<RedisKey>(collection.Count) : [];
+        foreach (string key in keys.Distinct())
+        {
+            ArgumentException.ThrowIfNullOrEmpty(key, nameof(keys));
+            keyList.Add(key);
+        }
+
         if (keyList.Count is 0)
             return ReadOnlyDictionary<string, TimeSpan?>.Empty;
 
@@ -899,17 +905,18 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     public async Task SetAllExpirationAsync(IDictionary<string, TimeSpan?> expirations)
     {
         ArgumentNullException.ThrowIfNull(expirations);
-
-        var validExpirations = expirations.Where(kvp => !String.IsNullOrEmpty(kvp.Key)).ToList();
-        if (validExpirations.Count == 0)
+        if (expirations.Count == 0)
             return;
+
+        if (expirations.ContainsKey(String.Empty))
+            throw new ArgumentException("Keys cannot be empty", nameof(expirations));
 
         await LoadScriptsAsync().AnyContext();
 
         if (_options.ConnectionMultiplexer.IsCluster())
         {
             await Parallel.ForEachAsync(
-                validExpirations.GroupBy(kvp => _options.ConnectionMultiplexer.HashSlot(kvp.Key)),
+                expirations.GroupBy(kvp => _options.ConnectionMultiplexer.HashSlot(kvp.Key)),
                 async (hashSlotGroup, ct) =>
                 {
                     var hashSlotExpirations = hashSlotGroup.ToList();
@@ -923,8 +930,8 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         }
         else
         {
-            var keys = validExpirations.Select(kvp => (RedisKey)kvp.Key).ToArray();
-            var values = validExpirations
+            var keys = expirations.Select(kvp => (RedisKey)kvp.Key).ToArray();
+            var values = expirations
                 .Select(kvp => (RedisValue)(kvp.Value.HasValue ? (long)kvp.Value.Value.TotalMilliseconds : -1))
                 .ToArray();
 
