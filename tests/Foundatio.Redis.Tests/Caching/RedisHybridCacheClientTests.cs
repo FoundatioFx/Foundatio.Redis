@@ -111,6 +111,12 @@ public class RedisHybridCacheClientTests : HybridCacheClientTestBase, IAsyncLife
     }
 
     [Fact]
+    public override Task GetAllExpirationAsync_WithInvalidKeys_ValidatesCorrectly()
+    {
+        return base.GetAllExpirationAsync_WithInvalidKeys_ValidatesCorrectly();
+    }
+
+    [Fact]
     public override Task GetAllExpirationAsync_WithMixedKeys_ReturnsExpectedResults()
     {
         return base.GetAllExpirationAsync_WithMixedKeys_ReturnsExpectedResults();
@@ -505,6 +511,12 @@ public class RedisHybridCacheClientTests : HybridCacheClientTestBase, IAsyncLife
     public override Task SetAllAsync_WithLargeNumberOfKeys_MeasuresThroughput()
     {
         return base.SetAllAsync_WithLargeNumberOfKeys_MeasuresThroughput();
+    }
+
+    [Fact]
+    public override Task SetAllExpirationAsync_WithInvalidItems_ValidatesCorrectly()
+    {
+        return base.SetAllExpirationAsync_WithInvalidItems_ValidatesCorrectly();
     }
 
     [Theory]
