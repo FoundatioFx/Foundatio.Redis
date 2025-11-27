@@ -36,7 +36,6 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     private LoadedLuaScript _setAllExpiration;
 
     public RedisCacheClient(RedisCacheClientOptions options)
-
     {
         _options = options;
         _timeProvider = options.TimeProvider ?? TimeProvider.System;
@@ -857,7 +856,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                     // -2 = key doesn't exist, -1 = no expiration, positive = TTL in ms
                     long[] ttls = (long[])redisResult;
                     if (ttls is null || ttls.Length != hashSlotKeys.Length)
-                        throw new ArgumentException("Hash slot count mismatch");
+                        throw new InvalidOperationException($"Script returned {ttls?.Length ?? 0} results for {hashSlotKeys.Length} keys");
 
                     for (int hashSlotIndex = 0; hashSlotIndex < hashSlotKeys.Length; hashSlotIndex++)
                     {
@@ -882,7 +881,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             // -2 = key doesn't exist, -1 = no expiration, positive = TTL in ms
             long[] ttls = (long[])redisResult;
             if (ttls is null || ttls.Length != redisKeys.Length)
-                throw new ArgumentException("Hash slot count mismatch");
+                throw new InvalidOperationException($"Script returned {ttls?.Length ?? 0} results for {redisKeys.Length} keys");
 
             var result = new Dictionary<string, TimeSpan?>();
             for (int keyIndex = 0; keyIndex < redisKeys.Length; keyIndex++)
