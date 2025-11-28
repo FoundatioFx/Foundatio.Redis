@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -92,8 +91,6 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 if (server.IsReplica)
                     continue;
 
-                // Try FLUSHDB first (fastest approach)
-                bool flushed = false;
                 try
                 {
                     long dbSize = await server.DatabaseSizeAsync(_options.Database).AnyContext();
@@ -138,21 +135,19 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
             foreach (var batch in redisKeys.Chunk(batchSize))
             {
-                await Parallel.ForEachAsync(
-                    batch.GroupBy(k => Database.Multiplexer.HashSlot(k)),
-                    async (hashSlotGroup, ct) =>
+                foreach (var hashSlotGroup in batch.GroupBy(k => Database.Multiplexer.HashSlot(k)))
+                {
+                    var hashSlotKeys = hashSlotGroup.ToArray();
+                    try
                     {
-                        var hashSlotKeys = hashSlotGroup.ToArray();
-                        try
-                        {
-                            long count = await Database.KeyDeleteAsync(hashSlotKeys).AnyContext();
-                            Interlocked.Add(ref deleted, count);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Unable to delete {HashSlot} keys ({Keys}): {Message}", hashSlotGroup.Key, hashSlotKeys, ex.Message);
-                        }
-                    }).AnyContext();
+                        long count = await Database.KeyDeleteAsync(hashSlotKeys).AnyContext();
+                        Interlocked.Add(ref deleted, count);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Unable to delete {HashSlot} keys ({Keys}): {Message}", hashSlotGroup.Key, hashSlotKeys, ex.Message);
+                    }
+                }
             }
         }
         else
@@ -167,13 +162,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             if (redisKeys.Count is 0)
                 return 0;
 
-            var keyBatches = redisKeys.Chunk(batchSize).ToArray();
-
-            // NOTE: StackExchange.Redis multiplexes all operations over a single connection and handles
-            // pipelining internally, so parallelism limits here only affect client-side Task creation,
-            // not Redis server load. Consider simplifying to Task.WhenAll in a future refactor.
-            int maxParallelism = Math.Min(8, Environment.ProcessorCount);
-            await Parallel.ForEachAsync(keyBatches, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism }, async (batch, ct) =>
+            foreach (var batch in redisKeys.Chunk(batchSize))
             {
                 try
                 {
@@ -184,7 +173,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 {
                     _logger.LogError(ex, "Unable to delete keys ({Keys}): {Message}", batch, ex.Message);
                 }
-            }).AnyContext();
+            }
         }
 
         return (int)deleted;
@@ -217,13 +206,11 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             {
                 if (isCluster)
                 {
-                    await Parallel.ForEachAsync(
-                        keys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)),
-                        async (slotGroup, ct) =>
-                        {
-                            long count = await Database.KeyDeleteAsync(slotGroup.ToArray()).AnyContext();
-                            Interlocked.Add(ref deleted, count);
-                        }).AnyContext();
+                    foreach (var slotGroup in keys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
+                    {
+                        long count = await Database.KeyDeleteAsync(slotGroup.ToArray()).AnyContext();
+                        Interlocked.Add(ref deleted, count);
+                    }
                 }
                 else
                 {
@@ -310,21 +297,18 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         if (_options.ConnectionMultiplexer.IsCluster())
         {
-            // Use the default concurrency on .NET 8 (-1)
-            var result = new ConcurrentDictionary<string, CacheValue<T>>(-1, redisKeys.Count);
-            await Parallel.ForEachAsync(
-                redisKeys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)),
-                async (hashSlotGroup, ct) =>
-                {
-                    var hashSlotKeys = hashSlotGroup.ToArray();
-                    var values = await Database.StringGetAsync(hashSlotKeys, _options.ReadMode).AnyContext();
+            var result = new Dictionary<string, CacheValue<T>>(redisKeys.Count);
+            foreach (var hashSlotGroup in redisKeys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
+            {
+                var hashSlotKeys = hashSlotGroup.ToArray();
+                var values = await Database.StringGetAsync(hashSlotKeys, _options.ReadMode).AnyContext();
 
-                    // Redis MGET guarantees that values are returned in the same order as keys.
-                    // Non-existent keys return nil/empty values in their respective positions.
-                    // https://redis.io/commands/mget
-                    for (int i = 0; i < hashSlotKeys.Length; i++)
-                        result[hashSlotKeys[i]] = RedisValueToCacheValue<T>(values[i]);
-                }).AnyContext();
+                // Redis MGET guarantees that values are returned in the same order as keys.
+                // Non-existent keys return nil/empty values in their respective positions.
+                // https://redis.io/commands/mget
+                for (int i = 0; i < hashSlotKeys.Length; i++)
+                    result[hashSlotKeys[i]] = RedisValueToCacheValue<T>(values[i]);
+            }
 
             return result.AsReadOnly();
         }
@@ -616,13 +600,11 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             // For cluster/sentinel, group keys by hash slot since batch operations
             // require all keys to be in the same slot
             int successCount = 0;
-            await Parallel.ForEachAsync(
-                pairs.GroupBy(p => _options.ConnectionMultiplexer.HashSlot(p.Key)),
-                async (slotGroup, ct) =>
-                {
-                    int count = await SetAllInternalAsync(slotGroup.ToArray(), expiresIn).AnyContext();
-                    Interlocked.Add(ref successCount, count);
-                }).AnyContext();
+            foreach (var slotGroup in pairs.GroupBy(p => _options.ConnectionMultiplexer.HashSlot(p.Key)))
+            {
+                int count = await SetAllInternalAsync(slotGroup.ToArray(), expiresIn).AnyContext();
+                Interlocked.Add(ref successCount, count);
+            }
             return successCount;
         }
 
@@ -829,37 +811,34 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         if (_options.ConnectionMultiplexer.IsCluster())
         {
-            // Use the default concurrency on .NET 8 (-1)
-            var result = new ConcurrentDictionary<string, TimeSpan?>(-1, keyList.Count);
-            await Parallel.ForEachAsync(
-                keyList.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)),
-                async (hashSlotGroup, ct) =>
+            var result = new Dictionary<string, TimeSpan?>(keyList.Count);
+            foreach (var hashSlotGroup in keyList.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
+            {
+                var hashSlotKeys = hashSlotGroup.ToArray();
+                var redisResult = await Database.ScriptEvaluateAsync(_getAllExpiration.Hash, hashSlotKeys).AnyContext();
+                if (redisResult.IsNull)
+                    continue;
+
+                // Lua script returns array of TTL values in milliseconds (in same order as keys)
+                // -2 = key doesn't exist, -1 = no expiration, positive = TTL in ms
+                long[] ttls = (long[])redisResult;
+                if (ttls is null || ttls.Length != hashSlotKeys.Length)
+                    throw new InvalidOperationException($"Script returned {ttls?.Length ?? 0} results for {hashSlotKeys.Length} keys");
+
+                for (int hashSlotIndex = 0; hashSlotIndex < hashSlotKeys.Length; hashSlotIndex++)
                 {
-                    var hashSlotKeys = hashSlotGroup.Select(k => (RedisKey)k).ToArray();
-                    var redisResult = await Database.ScriptEvaluateAsync(_getAllExpiration.Hash, hashSlotKeys).AnyContext();
-                    if (redisResult.IsNull)
-                        return;
-
-                    // Lua script returns array of TTL values in milliseconds (in same order as keys)
-                    // -2 = key doesn't exist, -1 = no expiration, positive = TTL in ms
-                    long[] ttls = (long[])redisResult;
-                    if (ttls is null || ttls.Length != hashSlotKeys.Length)
-                        throw new InvalidOperationException($"Script returned {ttls?.Length ?? 0} results for {hashSlotKeys.Length} keys");
-
-                    for (int hashSlotIndex = 0; hashSlotIndex < hashSlotKeys.Length; hashSlotIndex++)
-                    {
-                        string key = hashSlotKeys[hashSlotIndex];
-                        long ttl = ttls[hashSlotIndex];
-                        if (ttl >= 0) // Only include keys with positive TTL (exclude non-existent and persistent)
-                            result[key] = TimeSpan.FromMilliseconds(ttl);
-                    }
-                }).AnyContext();
+                    string key = hashSlotKeys[hashSlotIndex];
+                    long ttl = ttls[hashSlotIndex];
+                    if (ttl >= 0) // Only include keys with positive TTL (exclude non-existent and persistent)
+                        result[key] = TimeSpan.FromMilliseconds(ttl);
+                }
+            }
 
             return result.AsReadOnly();
         }
         else
         {
-            var redisKeys = keyList.Select(k => (RedisKey)k).ToArray();
+            var redisKeys = keyList.ToArray();
             var redisResult = await Database.ScriptEvaluateAsync(_getAllExpiration.Hash, redisKeys).AnyContext();
 
             if (redisResult.IsNull)
@@ -897,18 +876,16 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         if (_options.ConnectionMultiplexer.IsCluster())
         {
-            await Parallel.ForEachAsync(
-                expirations.GroupBy(kvp => _options.ConnectionMultiplexer.HashSlot(kvp.Key)),
-                async (hashSlotGroup, ct) =>
-                {
-                    var hashSlotExpirations = hashSlotGroup.ToList();
-                    var keys = hashSlotExpirations.Select(kvp => (RedisKey)kvp.Key).ToArray();
-                    var values = hashSlotExpirations
-                        .Select(kvp => (RedisValue)(kvp.Value.HasValue ? (long)kvp.Value.Value.TotalMilliseconds : -1))
-                        .ToArray();
+            foreach (var hashSlotGroup in expirations.GroupBy(kvp => _options.ConnectionMultiplexer.HashSlot(kvp.Key)))
+            {
+                var hashSlotExpirations = hashSlotGroup.ToList();
+                var keys = hashSlotExpirations.Select(kvp => (RedisKey)kvp.Key).ToArray();
+                var values = hashSlotExpirations
+                    .Select(kvp => (RedisValue)(kvp.Value.HasValue ? (long)kvp.Value.Value.TotalMilliseconds : -1))
+                    .ToArray();
 
-                    await Database.ScriptEvaluateAsync(_setAllExpiration.Hash, keys, values).AnyContext();
-                }).AnyContext();
+                await Database.ScriptEvaluateAsync(_setAllExpiration.Hash, keys, values).AnyContext();
+            }
         }
         else
         {
