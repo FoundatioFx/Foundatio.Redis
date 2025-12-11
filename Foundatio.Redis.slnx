@@ -6,6 +6,9 @@
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
     <File Path="build/common.props" />
+    <File Path="docker-compose.redis-sentinel.yml" />
+    <File Path="docker-compose.redis.yml" />
+    <File Path="docker-compose.valkey.yml" />
     <File Path="docker-compose.yml" />
     <File Path="README.md" />
     <File Path="tests/Directory.Build.props" />
