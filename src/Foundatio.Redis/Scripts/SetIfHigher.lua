@@ -20,5 +20,5 @@ else
     -- New key, no expiration (plain SET removes any TTL)
     redis.call('set', @key, @value)
   end
-  return @value
+  return tostring(@value)
 end
