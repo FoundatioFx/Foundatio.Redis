@@ -116,7 +116,10 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
                 _logger.LogTrace("Unsubscribing from topic {Topic}", _options.Topic);
                 try
                 {
-                    _channelMessageQueue?.Unsubscribe(CommandFlags.FireAndForget);
+                    // Use async unsubscribe with a bounded timeout to prevent hanging
+                    var unsubscribeTask = _channelMessageQueue?.UnsubscribeAsync();
+                    if (unsubscribeTask != null && !unsubscribeTask.Wait(TimeSpan.FromSeconds(5)))
+                        _logger.LogWarning("Timeout waiting for unsubscribe from topic {Topic}", _options.Topic);
                 }
                 catch (Exception ex)
                 {
