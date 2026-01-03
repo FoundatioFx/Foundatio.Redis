@@ -23,13 +23,10 @@ using Xunit;
 
 namespace Foundatio.Redis.Tests.Queues;
 
-public class RedisQueueTests : QueueTestBase
+public class RedisQueueTests : QueueTestBase, IAsyncLifetime
 {
     public RedisQueueTests(ITestOutputHelper output) : base(output)
     {
-        var muxer = SharedConnection.GetMuxer(Log);
-        while (muxer.CountAllKeysAsync().GetAwaiter().GetResult() != 0)
-            muxer.FlushAllAsync().GetAwaiter().GetResult();
     }
 
     protected override IQueue<SimpleWorkItem> GetQueue(int retries = 1, TimeSpan? workItemTimeout = null, TimeSpan? retryDelay = null, int[] retryMultipliers = null, int deadLetterMaxItems = 100, bool runQueueMaintenance = true, TimeProvider timeProvider = null)
@@ -794,4 +791,11 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
 
     private record Command1(int Id);
     private record Command2(int Id);
+
+    public ValueTask InitializeAsync()
+    {
+        _logger.LogDebug("Initializing");
+        var muxer = SharedConnection.GetMuxer(Log);
+        return new ValueTask(muxer.FlushAllAsync());
+    }
 }
