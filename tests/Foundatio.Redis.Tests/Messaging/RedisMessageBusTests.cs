@@ -18,6 +18,7 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
 {
     public RedisMessageBusTests(ITestOutputHelper output) : base(output)
     {
+        Log.DefaultLogLevel = LogLevel.Trace;
     }
 
     protected override IMessageBus GetMessageBus(Func<SharedMessageBusOptions, SharedMessageBusOptions> config = null)
