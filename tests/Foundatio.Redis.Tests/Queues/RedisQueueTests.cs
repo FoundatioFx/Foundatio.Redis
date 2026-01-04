@@ -25,7 +25,7 @@ namespace Foundatio.Redis.Tests.Queues;
 
 public class RedisQueueTests : QueueTestBase, IAsyncLifetime
 {
-    private readonly string _lockTopic = $"test-queue-{Guid.NewGuid().ToString("N")[..10]}";
+    private readonly string _topic = $"test-queue-{Guid.NewGuid().ToString("N")[..10]}";
 
     public RedisQueueTests(ITestOutputHelper output) : base(output)
     {
@@ -187,7 +187,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
     {
         var muxer = SharedConnection.GetMuxer(Log);
         using var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer, LoggerFactory = Log });
-        using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _lockTopic, LoggerFactory = Log });
+        using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
         var distributedLock = new CacheLockProvider(cache, messageBus, null, Log);
         await CanDequeueWithLockingImpAsync(distributedLock);
     }
@@ -197,7 +197,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
     {
         var muxer = SharedConnection.GetMuxer(Log);
         using var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer, LoggerFactory = Log });
-        using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _lockTopic, LoggerFactory = Log });
+        using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
         var distributedLock = new CacheLockProvider(cache, messageBus, null, Log);
         await CanHaveMultipleQueueInstancesWithLockingImplAsync(distributedLock);
     }
