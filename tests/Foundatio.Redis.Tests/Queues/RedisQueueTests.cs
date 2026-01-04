@@ -794,10 +794,19 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
     private record Command1(int Id);
     private record Command2(int Id);
 
-    public ValueTask InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
         var muxer = SharedConnection.GetMuxer(Log);
-        return new ValueTask(muxer.FlushAllAsync());
+        await muxer.FlushAllAsync();
+        // Add a small delay after flush to ensure cleanup in resource-constrained CI environments
+        await Task.Delay(50);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _logger.LogDebug("Disposing");
+        // Add a small delay to allow cleanup in resource-constrained CI environments
+        await Task.Delay(50);
     }
 }

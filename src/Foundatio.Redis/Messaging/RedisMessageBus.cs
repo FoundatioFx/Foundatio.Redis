@@ -117,6 +117,8 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
                 try
                 {
                     _channelMessageQueue?.Unsubscribe(CommandFlags.FireAndForget);
+                    // Give unsubscribe a moment to process in resource-constrained environments
+                    Task.Delay(10).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
                 {

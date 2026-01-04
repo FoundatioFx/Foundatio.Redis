@@ -781,6 +781,8 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                     try
                     {
                         _subscriber.Unsubscribe(RedisChannel.Literal(GetTopicName()), OnTopicMessage, CommandFlags.FireAndForget);
+                        // Give unsubscribe a moment to process in resource-constrained environments
+                        Task.Delay(10).GetAwaiter().GetResult();
                     }
                     catch (Exception ex)
                     {

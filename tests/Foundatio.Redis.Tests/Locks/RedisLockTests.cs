@@ -105,18 +105,20 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
         _messageBus.Dispose();
     }
 
-    public ValueTask InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
         var muxer = SharedConnection.GetMuxer(Log);
-        return new ValueTask(muxer.FlushAllAsync());
+        await muxer.FlushAllAsync();
+        // Add a small delay after flush to ensure cleanup in resource-constrained CI environments
+        await Task.Delay(50);
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _logger.LogDebug("Disposing");
         Dispose();
-
-        return ValueTask.CompletedTask;
+        // Add a small delay to allow cleanup in resource-constrained CI environments
+        await Task.Delay(50);
     }
 }

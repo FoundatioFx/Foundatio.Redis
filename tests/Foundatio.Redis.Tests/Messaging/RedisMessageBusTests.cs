@@ -204,9 +204,10 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
         return new ValueTask(muxer.FlushAllAsync());
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         _logger.LogDebug("Disposing");
-        return ValueTask.CompletedTask;
+        // Add a small delay to allow cleanup in resource-constrained CI environments
+        await Task.Delay(50);
     }
 }
