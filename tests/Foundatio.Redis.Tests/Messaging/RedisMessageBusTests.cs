@@ -81,7 +81,6 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
     [Fact]
     public override Task CanReceiveMessagesConcurrentlyAsync()
     {
-        Log.DefaultLogLevel = LogLevel.Trace;
         return base.CanReceiveMessagesConcurrentlyAsync();
     }
 
