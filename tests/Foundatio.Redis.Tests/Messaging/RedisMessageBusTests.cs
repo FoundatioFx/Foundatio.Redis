@@ -11,13 +11,13 @@ using Foundatio.Tests.Messaging;
 using Foundatio.Tests.Queue;
 using Microsoft.Extensions.Logging;
 using Xunit;
-using Xunit.Abstractions;
-using IAsyncLifetime = Xunit.IAsyncLifetime;
 
 namespace Foundatio.Redis.Tests.Messaging;
 
 public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
 {
+    private readonly string _topic = $"test-messages-{Guid.NewGuid().ToString("N")[..10]}";
+
     public RedisMessageBusTests(ITestOutputHelper output) : base(output)
     {
     }
@@ -27,7 +27,7 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
         return new RedisMessageBus(o =>
         {
             o.Subscriber(SharedConnection.GetMuxer(Log).GetSubscriber());
-            o.Topic("test-messages");
+            o.Topic(_topic);
             o.LoggerFactory(Log);
             if (config != null)
                 config(o.Target);
@@ -154,7 +154,7 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
     public async Task CanDisposeCacheAndQueueAndReceiveSubscribedMessages()
     {
         var muxer = SharedConnection.GetMuxer(Log);
-        var messageBus1 = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = "test-messages", LoggerFactory = Log });
+        var messageBus1 = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
 
         var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer });
         Assert.NotNull(cache);
@@ -180,10 +180,10 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
                     {
                         Assert.Equal("Hello", msg.Data);
                         countdown.Signal();
-                    });
+                    }, TestCancellationToken);
 
                     await messageBus1.PublishAsync(new SimpleMessageA { Data = "Hello" });
-                    await countdown.WaitAsync(TimeSpan.FromSeconds(2));
+                    await Assert.ThrowsAsync<TimeoutException>(async () => await countdown.WaitAsync(TimeSpan.FromSeconds(2)));
                     Assert.Equal(1, countdown.CurrentCount);
 
                     cache.Dispose();
@@ -197,16 +197,16 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
         }
     }
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
         var muxer = SharedConnection.GetMuxer(Log);
-        return muxer.FlushAllAsync();
+        return new ValueTask(muxer.FlushAllAsync());
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _logger.LogDebug("Disposing");
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 }

@@ -7,13 +7,12 @@ using Foundatio.Redis.Tests.Extensions;
 using Foundatio.Tests.Locks;
 using Microsoft.Extensions.Logging;
 using Xunit;
-using Xunit.Abstractions;
-using IAsyncLifetime = Xunit.IAsyncLifetime;
 
 namespace Foundatio.Redis.Tests.Locks;
 
 public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
 {
+    private readonly string _topic = $"test-lock-{Guid.NewGuid().ToString("N")[..10]}";
     private readonly ICacheClient _cache;
     private readonly IMessageBus _messageBus;
 
@@ -21,7 +20,7 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
     {
         var muxer = SharedConnection.GetMuxer(Log);
         _cache = new RedisCacheClient(o => o.ConnectionMultiplexer(muxer).LoggerFactory(Log));
-        _messageBus = new RedisMessageBus(o => o.Subscriber(muxer.GetSubscriber()).Topic("test-lock").LoggerFactory(Log));
+        _messageBus = new RedisMessageBus(o => o.Subscriber(muxer.GetSubscriber()).Topic(_topic).LoggerFactory(Log));
     }
 
     protected override ILockProvider GetThrottlingLockProvider(int maxHits, TimeSpan period)
@@ -106,18 +105,18 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
         _messageBus.Dispose();
     }
 
-    public Task InitializeAsync()
+    public ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
         var muxer = SharedConnection.GetMuxer(Log);
-        return muxer.FlushAllAsync();
+        return new ValueTask(muxer.FlushAllAsync());
     }
 
-    public Task DisposeAsync()
+    public ValueTask DisposeAsync()
     {
         _logger.LogDebug("Disposing");
         Dispose();
 
-        return Task.CompletedTask;
+        return ValueTask.CompletedTask;
     }
 }

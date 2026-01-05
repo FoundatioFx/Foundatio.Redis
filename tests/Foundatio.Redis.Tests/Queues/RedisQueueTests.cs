@@ -18,19 +18,17 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using StackExchange.Redis;
 using Xunit;
-using Xunit.Abstractions;
 
 #pragma warning disable 4014
 
 namespace Foundatio.Redis.Tests.Queues;
 
-public class RedisQueueTests : QueueTestBase
+public class RedisQueueTests : QueueTestBase, IAsyncLifetime
 {
+    private readonly string _topic = $"test-queue-{Guid.NewGuid().ToString("N")[..10]}";
+
     public RedisQueueTests(ITestOutputHelper output) : base(output)
     {
-        var muxer = SharedConnection.GetMuxer(Log);
-        while (muxer.CountAllKeysAsync().GetAwaiter().GetResult() != 0)
-            muxer.FlushAllAsync().GetAwaiter().GetResult();
     }
 
     protected override IQueue<SimpleWorkItem> GetQueue(int retries = 1, TimeSpan? workItemTimeout = null, TimeSpan? retryDelay = null, int[] retryMultipliers = null, int deadLetterMaxItems = 100, bool runQueueMaintenance = true, TimeProvider timeProvider = null)
@@ -189,7 +187,7 @@ public class RedisQueueTests : QueueTestBase
     {
         var muxer = SharedConnection.GetMuxer(Log);
         using var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer, LoggerFactory = Log });
-        using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = "test-queue", LoggerFactory = Log });
+        using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
         var distributedLock = new CacheLockProvider(cache, messageBus, null, Log);
         await CanDequeueWithLockingImpAsync(distributedLock);
     }
@@ -199,7 +197,7 @@ public class RedisQueueTests : QueueTestBase
     {
         var muxer = SharedConnection.GetMuxer(Log);
         using var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer, LoggerFactory = Log });
-        using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = "test-queue", LoggerFactory = Log });
+        using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
         var distributedLock = new CacheLockProvider(cache, messageBus, null, Log);
         await CanHaveMultipleQueueInstancesWithLockingImplAsync(distributedLock);
     }
@@ -259,7 +257,7 @@ public class RedisQueueTests : QueueTestBase
             Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}:dequeued"));
             Assert.Equal(5, await muxer.CountAllKeysAsync());
 
-            await Task.Delay(TimeSpan.FromSeconds(4));
+            await Task.Delay(TimeSpan.FromSeconds(4), TestCancellationToken);
 
             Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}"));
             Assert.Equal(0, await db.ListLengthAsync($"{listPrefix}:in"));
@@ -476,7 +474,7 @@ public class RedisQueueTests : QueueTestBase
 
         // Wait longer than the workItemTimeout.
         // This is the period between a queue having DequeueAsync called on it and the first item being enqueued.
-        await Task.Delay(workItemTimeout.Add(TimeSpan.FromMilliseconds(1)));
+        await Task.Delay(workItemTimeout.Add(TimeSpan.FromMilliseconds(1)), TestCancellationToken);
 
         // Add an item. DequeueAsync can now return.
         string id = await queue.EnqueueAsync(new SimpleWorkItem
@@ -524,7 +522,7 @@ public class RedisQueueTests : QueueTestBase
         // enqueue item to queue, no reader yet
         await queue.EnqueueAsync(new SimpleWorkItem());
 
-        // to create a database, we want to cause delay in redis to reproduce the issue
+        // to create a database timeout, we want to cause delay in redis to reproduce the issue
         var database = muxer.GetDatabase();
 
         // sync / async ops timeout is not working as described: https://stackexchange.github.io/StackExchange.Redis/Configuration
@@ -538,7 +536,7 @@ public class RedisQueueTests : QueueTestBase
 local now = tonumber(redis.call(""time"")[1]);
 while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end";
 
-        // db will be busy for DELAY_TIME_USEC which will cause timeout on the dequeue to follow
+        // db will be busy for DELAY_TIME_SEC which will cause timeout on the dequeue to follow
         database.ScriptEvaluateAsync(databaseDelayScript);
 
         var completion = new TaskCompletionSource<bool>();
@@ -548,8 +546,9 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
             completion.SetResult(true);
         });
 
-        // wait for the databaseDelayScript to finish
-        await Task.Delay(DELAY_TIME_SEC * 1000);
+        // wait for the databaseDelayScript to finish - the script blocks ALL Redis connections
+        // so we must wait before trying to verify with any connection
+        await Task.Delay((DELAY_TIME_SEC + 1) * 1000);
 
         // item should've either timed out at some iterations and after databaseDelayScript is done be received
         // or it might have moved to work, in this case we want to make sure the correct keys were created
@@ -699,7 +698,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
             await workItem.CompleteAsync();
             work++;
             countdown.Signal();
-        });
+        }, cancellationToken: TestCancellationToken);
 
         await countdown.WaitAsync(TimeSpan.FromMinutes(1));
         Assert.Equal(0, countdown.CurrentCount);
@@ -721,7 +720,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         await HandlerCommand1Async();
         await HandlerCommand2Async();
 
-        await Task.Delay(1000);
+        await Task.Delay(1000, TestCancellationToken);
 
         await Publish1Async();
         await Publish2Async();
@@ -794,4 +793,11 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
 
     private record Command1(int Id);
     private record Command2(int Id);
+
+    public ValueTask InitializeAsync()
+    {
+        _logger.LogDebug("Initializing");
+        var muxer = SharedConnection.GetMuxer(Log);
+        return new ValueTask(muxer.FlushAllAsync());
+    }
 }
