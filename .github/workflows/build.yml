@@ -5,3 +5,5 @@ jobs:
   build:
     uses: FoundatioFx/Foundatio/.github/workflows/build-workflow.yml@main
     secrets: inherit
+    with:
+      new-test-runner: true
