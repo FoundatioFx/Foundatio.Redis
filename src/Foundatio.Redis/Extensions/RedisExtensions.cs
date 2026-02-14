@@ -112,22 +112,4 @@ public static class RedisExtensions
 
         return false;
     }
-
-    /// <summary>
-    /// Returns true only for actual Redis Cluster deployments (ServerType.Cluster).
-    /// Unlike <see cref="IsCluster"/>, this does NOT return true for Twemproxy or
-    /// sentinel-only configurations. Use this when you need Redis Cluster-specific
-    /// features like sharded pub/sub (SPUBLISH/SSUBSCRIBE).
-    /// </summary>
-    public static bool IsRedisCluster(this IConnectionMultiplexer muxer)
-    {
-        foreach (var endPoint in muxer.GetEndPoints())
-        {
-            var server = muxer.GetServer(endPoint);
-            if (server.IsConnected && server.ServerType == ServerType.Cluster)
-                return true;
-        }
-
-        return false;
-    }
 }

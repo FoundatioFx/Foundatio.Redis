@@ -42,12 +42,7 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
     /// See: https://redis.io/docs/latest/commands/spublish/
     /// See: https://redis.io/docs/latest/commands/ssubscribe/
     /// </summary>
-    /// <remarks>
-    /// The ??= pattern is intentionally not locked. RedisChannel is a readonly struct;
-    /// the worst case of a concurrent race is calling IsRedisCluster() twice, which is
-    /// harmless since both threads produce the same value.
-    /// </remarks>
-    private RedisChannel Channel => _channel ??= _options.Subscriber.Multiplexer.IsRedisCluster()
+    private RedisChannel Channel => _channel ??= _options.Subscriber.Multiplexer.IsCluster()
         ? RedisChannel.Sharded(_options.Topic)
         : RedisChannel.Literal(_options.Topic);
 
