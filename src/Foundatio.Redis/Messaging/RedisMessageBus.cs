@@ -29,17 +29,25 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
     }
 
     /// <summary>
-    /// Gets the Redis channel for pub/sub. In cluster mode, uses sharded pub/sub
-    /// (SPUBLISH/SSUBSCRIBE) to avoid duplicate message delivery. Regular PUBLISH
-    /// in a cluster broadcasts to all nodes, and StackExchange.Redis spreads Literal
-    /// subscriptions across nodes, causing subscribers to receive messages multiple
-    /// times. Sharded pub/sub routes all operations for a given channel through a
-    /// single shard, ensuring exactly-once delivery while preserving full fanout.
-    /// Falls back to standard PUBLISH/SUBSCRIBE for standalone and sentinel deployments.
+    /// Gets the Redis channel for pub/sub. In Redis Cluster mode, uses sharded pub/sub
+    /// (SPUBLISH/SSUBSCRIBE) to avoid duplicate message delivery caused by cluster-wide
+    /// broadcast. Regular PUBLISH in a cluster broadcasts to all nodes, and StackExchange.Redis
+    /// spreads Literal subscriptions across nodes, which can cause subscribers to receive
+    /// the same message multiple times from different primaries. Sharded pub/sub routes all
+    /// operations for a given channel through a single shard, preventing per-primary duplicate
+    /// delivery while preserving full fanout to all subscribers on that shard. This does not
+    /// provide end-to-end exactly-once semantics; callers must remain tolerant of lost or
+    /// duplicated messages across disconnects and retries.
+    /// Falls back to standard PUBLISH/SUBSCRIBE for standalone, sentinel, and proxy deployments.
     /// See: https://redis.io/docs/latest/commands/spublish/
     /// See: https://redis.io/docs/latest/commands/ssubscribe/
     /// </summary>
-    private RedisChannel Channel => _channel ??= _options.Subscriber.Multiplexer.IsCluster()
+    /// <remarks>
+    /// The ??= pattern is intentionally not locked. RedisChannel is a readonly struct;
+    /// the worst case of a concurrent race is calling IsRedisCluster() twice, which is
+    /// harmless since both threads produce the same value.
+    /// </remarks>
+    private RedisChannel Channel => _channel ??= _options.Subscriber.Multiplexer.IsRedisCluster()
         ? RedisChannel.Sharded(_options.Topic)
         : RedisChannel.Literal(_options.Topic);
 

@@ -471,9 +471,41 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     }
 
     [Fact]
-    public override Task RemoveIfEqualAsync_WithNonMatchingValue_DoesNotPublishInvalidation()
+    public override async Task RemoveIfEqualAsync_WithNonMatchingValue_DoesNotPublishInvalidation()
     {
-        return base.RemoveIfEqualAsync_WithNonMatchingValue_DoesNotPublishInvalidation();
+        // Override to work around race condition in base test: SetAsync publishes an
+        // InvalidateCache message that can arrive at secondCache after initialInvalidateCalls
+        // is captured, causing a spurious failure. We wait for the invalidation to drain,
+        // then re-populate secondCache's local cache before capturing the baseline.
+        using var firstCache = GetDistributedHybridCacheClient();
+        Assert.NotNull(firstCache);
+
+        using var secondCache = GetDistributedHybridCacheClient();
+        Assert.NotNull(secondCache);
+
+        const string cacheKey = "remove-if-equal-no-publish-test";
+
+        await firstCache.SetAsync(cacheKey, "actual-value");
+        Assert.Equal(1, firstCache.LocalCache.Count);
+
+        // Allow the SetAsync invalidation to drain before populating secondCache
+        await Task.Delay(250, TestCancellationToken);
+
+        // Now populate secondCache's local cache (any prior invalidation has been processed)
+        var result = await secondCache.GetAsync<string>(cacheKey);
+        Assert.True(result.HasValue);
+        Assert.Equal("actual-value", result.Value);
+        Assert.Equal(1, secondCache.LocalCache.Count);
+
+        long initialInvalidateCalls = secondCache.InvalidateCacheCalls;
+
+        bool removed = await firstCache.RemoveIfEqualAsync(cacheKey, "wrong-value");
+        Assert.False(removed);
+
+        await Task.Delay(250, TestCancellationToken);
+
+        Assert.Equal(initialInvalidateCalls, secondCache.InvalidateCacheCalls);
+        Assert.Equal(1, secondCache.LocalCache.Count);
     }
 
     [Fact]
