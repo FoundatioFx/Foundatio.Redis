@@ -17,11 +17,10 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
     private readonly AsyncLock _lock = new();
     private bool _isSubscribed;
     private ChannelMessageQueue _channelMessageQueue;
-    private readonly Lazy<RedisChannel> _channel;
+    private RedisChannel? _channel;
 
     public RedisMessageBus(RedisMessageBusOptions options) : base(options)
     {
-        _channel = new Lazy<RedisChannel>(ResolveChannel);
     }
 
     public RedisMessageBus(Builder<RedisMessageBusOptionsBuilder, RedisMessageBusOptions> config)
@@ -30,37 +29,19 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
     }
 
     /// <summary>
-    /// Resolves the Redis channel to use for pub/sub. In cluster mode running Redis 7.0+,
-    /// uses sharded pub/sub (SPUBLISH/SSUBSCRIBE) to avoid duplicate message delivery.
-    /// Regular PUBLISH in a cluster broadcasts to all nodes, and StackExchange.Redis spreads
-    /// Literal subscriptions across nodes, causing subscribers to receive the message multiple
-    /// times. Sharded pub/sub routes all operations for a given channel through a single shard,
-    /// ensuring exactly-once delivery while preserving full fanout to all subscribers.
-    /// Falls back to standard PUBLISH/SUBSCRIBE for standalone, sentinel, or pre-7.0 clusters.
+    /// Gets the Redis channel for pub/sub. In cluster mode, uses sharded pub/sub
+    /// (SPUBLISH/SSUBSCRIBE) to avoid duplicate message delivery. Regular PUBLISH
+    /// in a cluster broadcasts to all nodes, and StackExchange.Redis spreads Literal
+    /// subscriptions across nodes, causing subscribers to receive messages multiple
+    /// times. Sharded pub/sub routes all operations for a given channel through a
+    /// single shard, ensuring exactly-once delivery while preserving full fanout.
+    /// Falls back to standard PUBLISH/SUBSCRIBE for standalone and sentinel deployments.
     /// See: https://redis.io/docs/latest/commands/spublish/
     /// See: https://redis.io/docs/latest/commands/ssubscribe/
-    /// See: https://stackexchange.github.io/StackExchange.Redis/ReleaseNotes (2.8.41+)
     /// </summary>
-    private RedisChannel ResolveChannel()
-    {
-        if (!_options.Subscriber.Multiplexer.IsCluster())
-            return RedisChannel.Literal(_options.Topic);
-
-        // SPUBLISH/SSUBSCRIBE require Redis 7.0+. Fall back to Literal for older clusters.
-        var endpoints = _options.Subscriber.Multiplexer.GetEndPoints();
-        foreach (var endpoint in endpoints)
-        {
-            var server = _options.Subscriber.Multiplexer.GetServer(endpoint);
-            if (server.IsConnected && !server.IsReplica && server.Version < new Version(7, 0))
-            {
-                _logger.LogDebug("Redis server {Endpoint} version {Version} does not support sharded pub/sub (requires 7.0+), using standard PUBLISH/SUBSCRIBE",
-                    endpoint, server.Version);
-                return RedisChannel.Literal(_options.Topic);
-            }
-        }
-
-        return RedisChannel.Sharded(_options.Topic);
-    }
+    private RedisChannel Channel => _channel ??= _options.Subscriber.Multiplexer.IsCluster()
+        ? RedisChannel.Sharded(_options.Topic)
+        : RedisChannel.Literal(_options.Topic);
 
     protected override async Task EnsureTopicSubscriptionAsync(CancellationToken cancellationToken)
     {
@@ -73,7 +54,7 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
                 return;
 
             _logger.LogTrace("Subscribing to topic: {Topic}", _options.Topic);
-            _channelMessageQueue = await _options.Subscriber.SubscribeAsync(_channel.Value).AnyContext();
+            _channelMessageQueue = await _options.Subscriber.SubscribeAsync(Channel).AnyContext();
             _channelMessageQueue.OnMessage(OnMessage);
             _isSubscribed = true;
             _logger.LogTrace("Subscribed to topic: {Topic}", _options.Topic);
@@ -153,7 +134,7 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
         // TODO: Use ILockProvider to lock on UniqueId to ensure it doesn't get duplicated
         // Wrap only the transport call in resilience policy
         await _resiliencePolicy.ExecuteAsync(async _ =>
-            await _options.Subscriber.PublishAsync(_channel.Value, data, CommandFlags.FireAndForget),
+            await _options.Subscriber.PublishAsync(Channel, data, CommandFlags.FireAndForget),
             cancellationToken).AnyContext();
     }
 
