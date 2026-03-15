@@ -737,13 +737,52 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
     [Fact]
     public async Task CanHaveDifferentMessageTypeInQueueWithSameNameAsync()
     {
-        await HandlerCommand1Async();
-        await HandlerCommand2Async();
+        var handlerQueue1 = CreateQueue<Command1>();
+        var handlerQueue2 = CreateQueue<Command2>();
 
-        await Task.Delay(1000, TestCancellationToken);
+        try
+        {
+            await handlerQueue1.StartWorkingAsync((entry, _) =>
+            {
+                _logger.LogInformation("{UtcNow}: Handler1 {Name} {ValueId}", DateTime.UtcNow, entry.Value.GetType().Name, entry.Value.Id);
+                Assert.InRange(entry.Value.Id, 100, 199);
+                return Task.CompletedTask;
+            });
 
-        await Publish1Async();
-        await Publish2Async();
+            await handlerQueue2.StartWorkingAsync((entry, _) =>
+            {
+                _logger.LogInformation("{UtcNow}: Handler2 {Name} {ValueId}", DateTime.UtcNow, entry.Value.GetType().Name, entry.Value.Id);
+                Assert.InRange(entry.Value.Id, 200, 299);
+                return Task.CompletedTask;
+            }, true);
+
+            await Task.Delay(1000, TestCancellationToken);
+
+            using (var publishQueue1 = CreateQueue<Command1>())
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    var cmd = new Command1(100 + i);
+                    _logger.LogInformation("{UtcNow}: Publish Command1 {CmdId}", DateTime.UtcNow, cmd.Id);
+                    await publishQueue1.EnqueueAsync(cmd);
+                }
+            }
+
+            using (var publishQueue2 = CreateQueue<Command2>())
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    var cmd = new Command2(200 + i);
+                    _logger.LogInformation("{UtcNow}: Publish Command2 {CmdId}", DateTime.UtcNow, cmd.Id);
+                    await publishQueue2.EnqueueAsync(cmd);
+                }
+            }
+        }
+        finally
+        {
+            handlerQueue1.Dispose();
+            handlerQueue2.Dispose();
+        }
     }
 
     private IQueue<T> CreateQueue<T>(bool allQueuesTheSameName = true) where T : class
@@ -761,54 +800,6 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
 
         _logger.LogDebug("Queue Id: {QueueId}", queue.QueueId);
         return queue;
-    }
-
-    private Task HandlerCommand1Async()
-    {
-        var q = CreateQueue<Command1>();
-
-        return q.StartWorkingAsync((entry, _) =>
-        {
-            _logger.LogInformation("{UtcNow}: Handler1 {Name} {ValueId}", DateTime.UtcNow, entry.Value.GetType().Name, entry.Value.Id);
-            Assert.InRange(entry.Value.Id, 100, 199);
-            return Task.CompletedTask;
-        });
-    }
-
-    private Task HandlerCommand2Async()
-    {
-        var q = CreateQueue<Command2>();
-
-        return q.StartWorkingAsync((entry, _) =>
-        {
-            _logger.LogInformation("{UtcNow}: Handler2 {Name} {ValueId}", DateTime.UtcNow, entry.Value.GetType().Name, entry.Value.Id);
-            Assert.InRange(entry.Value.Id, 200, 299);
-            return Task.CompletedTask;
-        }, true);
-    }
-
-    private async Task Publish1Async()
-    {
-        var q = CreateQueue<Command1>();
-
-        for (int i = 0; i < 10; i++)
-        {
-            var cmd = new Command1(100 + i);
-            _logger.LogInformation("{UtcNow}: Publish Command1 {CmdId}", DateTime.UtcNow, cmd.Id);
-            await q.EnqueueAsync(cmd);
-        }
-    }
-
-    private async Task Publish2Async()
-    {
-        var q = CreateQueue<Command2>();
-
-        for (int i = 0; i < 10; i++)
-        {
-            var cmd = new Command2(200 + i);
-            _logger.LogInformation("{UtcNow}: Publish Command2 {CmdId}", DateTime.UtcNow, cmd.Id);
-            await q.EnqueueAsync(cmd);
-        }
     }
 
     [Fact]
