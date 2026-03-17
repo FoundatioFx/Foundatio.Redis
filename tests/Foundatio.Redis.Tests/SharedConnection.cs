@@ -11,6 +11,10 @@ public static class SharedConnection
     private static ConnectionMultiplexer _muxerResp2;
     private static ConnectionMultiplexer _muxerResp3;
 
+    /// <summary>
+    /// Returns a shared ConnectionMultiplexer for the given protocol. Two instances are cached (RESP2 and RESP3)
+    /// so the test suite can run the same tests under both protocols without reconnecting.
+    /// </summary>
     public static ConnectionMultiplexer GetMuxer(ILoggerFactory loggerFactory, RedisProtocol? protocol = null)
     {
         string connectionString = Configuration.GetConnectionString("RedisConnectionString");
