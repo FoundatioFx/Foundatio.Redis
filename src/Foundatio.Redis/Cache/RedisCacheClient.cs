@@ -429,7 +429,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
     private async Task SetListExpirationAsync(string key)
     {
-        var items = await Database.SortedSetRangeByRankWithScoresAsync(key, 0, 0, order: Order.Descending).AnyContext();
+        var items = await Database.SortedSetRangeByRankWithScoresAsync(key, 0, 0, order: Order.Descending, flags: _options.ReadMode).AnyContext();
         if (items.Length == 0)
         {
             _logger.LogTrace("Sorted set is empty for key: {Key}, expiration will not be set", key);
@@ -801,14 +801,14 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
 
-        return Database.KeyExistsAsync(key);
+        return Database.KeyExistsAsync(key, _options.ReadMode);
     }
 
     public Task<TimeSpan?> GetExpirationAsync(string key)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
 
-        return Database.KeyTimeToLiveAsync(key);
+        return Database.KeyTimeToLiveAsync(key, _options.ReadMode);
     }
 
     public Task SetExpirationAsync(string key, TimeSpan expiresIn)

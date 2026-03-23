@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using StackExchange.Redis;
 
 namespace Foundatio.Caching;
@@ -13,7 +13,10 @@ public class RedisCacheClientOptions : SharedOptions
     public bool ShouldThrowOnSerializationError { get; set; } = true;
 
     /// <summary>
-    /// The behaviour required when performing read operations from cache
+    /// Controls how read operations are routed in a master-replica topology.
+    /// Set to <see cref="CommandFlags.PreferReplica"/> to distribute reads to replica nodes (recommended for master-replica setups).
+    /// Writes always go to the master regardless of this setting.
+    /// Default is <see cref="CommandFlags.None"/> (reads go to master).
     /// </summary>
     public CommandFlags ReadMode { get; set; } = CommandFlags.None;
 

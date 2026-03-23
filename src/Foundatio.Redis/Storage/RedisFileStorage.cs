@@ -65,7 +65,7 @@ public class RedisFileStorage : IFileStorage
         string normalizedPath = NormalizePath(path);
         _logger.LogTrace("Getting file stream for {Path}", normalizedPath);
 
-        var fileContent = await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashGetAsync(_options.ContainerName, normalizedPath), cancellationToken).AnyContext();
+        var fileContent = await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashGetAsync(_options.ContainerName, normalizedPath, _options.ReadMode), cancellationToken).AnyContext();
         if (fileContent.IsNull)
         {
             _logger.LogError("Unable to get file stream for {Path}: File Not Found", normalizedPath);
@@ -83,7 +83,7 @@ public class RedisFileStorage : IFileStorage
         string normalizedPath = NormalizePath(path);
         _logger.LogTrace("Getting file info for {Path}", normalizedPath);
 
-        var fileSpec = await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashGetAsync(_fileSpecContainer, normalizedPath)).AnyContext();
+        var fileSpec = await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashGetAsync(_fileSpecContainer, normalizedPath, _options.ReadMode)).AnyContext();
         if (!fileSpec.HasValue)
         {
             _logger.LogError("Unable to get file info for {Path}: File Not Found", normalizedPath);
@@ -101,7 +101,7 @@ public class RedisFileStorage : IFileStorage
         string normalizedPath = NormalizePath(path);
         _logger.LogTrace("Checking if {Path} exists", normalizedPath);
 
-        return await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashExistsAsync(_fileSpecContainer, normalizedPath)).AnyContext();
+        return await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashExistsAsync(_fileSpecContainer, normalizedPath, _options.ReadMode)).AnyContext();
     }
 
     public async Task<bool> SaveFileAsync(string path, Stream stream, CancellationToken cancellationToken = default)
@@ -250,7 +250,7 @@ public class RedisFileStorage : IFileStorage
             "Getting file list matching {Prefix} and {Pattern}...", prefix, patternRegex
         );
 
-        return Task.FromResult(Database.HashScan(_fileSpecContainer, $"{prefix}*")
+        return Task.FromResult(Database.HashScan(_fileSpecContainer, $"{prefix}*", flags: _options.ReadMode)
             .Select(entry => _serializer.Deserialize<FileSpec>((byte[])entry.Value))
             .Where(fileSpec => patternRegex == null || patternRegex.IsMatch(fileSpec.Path))
             .Take(pageSize)
@@ -281,7 +281,7 @@ public class RedisFileStorage : IFileStorage
             "Getting files matching {Prefix} and {Pattern}...", criteria.Prefix, criteria.Pattern
         );
 
-        var list = Database.HashScan(_fileSpecContainer, $"{criteria.Prefix}*")
+        var list = Database.HashScan(_fileSpecContainer, $"{criteria.Prefix}*", flags: _options.ReadMode)
             .Select(entry => _serializer.Deserialize<FileSpec>((byte[])entry.Value))
             .Where(fileSpec => criteria.Pattern == null || criteria.Pattern.IsMatch(fileSpec.Path))
             .Skip(skip)

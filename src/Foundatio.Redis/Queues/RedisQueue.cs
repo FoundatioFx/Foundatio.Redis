@@ -45,7 +45,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
 
         options.ConnectionMultiplexer.ConnectionRestored += ConnectionMultiplexerOnConnectionRestored;
 
-        _cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = options.ConnectionMultiplexer, Serializer = _serializer });
+        _cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = options.ConnectionMultiplexer, Serializer = _serializer, ReadMode = options.ReadMode });
 
         _payloadTimeToLive = GetPayloadTtl();
         _subscriber = _options.ConnectionMultiplexer.GetSubscriber();
