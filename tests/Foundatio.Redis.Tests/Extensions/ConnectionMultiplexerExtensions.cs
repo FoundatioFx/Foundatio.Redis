@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using StackExchange.Redis;
 
@@ -36,14 +34,5 @@ public static class ConnectionMultiplexerExtensions
         }
 
         return count;
-    }
-
-    public static List<string> GetAllKeys(this ConnectionMultiplexer muxer)
-    {
-        return muxer.GetEndPoints()
-            .Select(endpoint => muxer.GetServer(endpoint))
-            .Where(server => !server.IsReplica)
-            .SelectMany(server => server.Keys(pattern: "*").Select(k => k.ToString()))
-            .ToList();
     }
 }

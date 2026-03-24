@@ -403,8 +403,13 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
         var keyCount = await muxer.CountAllKeysAsync();
         if (keyCount != 5)
         {
-            var allKeys = muxer.GetAllKeys();
-            _logger.LogError("Expected 5 keys but found {KeyCount}. Keys: {Keys}", keyCount, string.Join(", ", allKeys));
+            var server = muxer.GetServer(muxer.GetEndPoints().First());
+            const int maxKeysToLog = 50;
+            var allKeys = server.Keys(pattern: "*").Take(maxKeysToLog).Select(k => k.ToString()).ToList();
+            var keysSummary = string.Join(", ", allKeys);
+            if (keyCount > maxKeysToLog)
+                keysSummary += $", ... (showing first {maxKeysToLog} of {keyCount} keys)";
+            _logger.LogError("Expected 5 keys but found {KeyCount}. Keys: {Keys}", keyCount, keysSummary);
         }
         Assert.Equal(5, keyCount);
 
