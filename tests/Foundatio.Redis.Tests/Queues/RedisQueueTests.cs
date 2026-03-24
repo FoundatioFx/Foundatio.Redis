@@ -400,7 +400,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
         Assert.False(await db.KeyExistsAsync($"{listPrefix}:{id}:renewed"));
         Assert.Equal(1, await db.StringGetAsync($"{listPrefix}:{id}:attempts"));
         Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}:wait"));
-        Assert.InRange(await muxer.CountAllKeysAsync(), 5, 6);
+        Assert.Equal(5, await muxer.CountAllKeysAsync());
 
         timeProvider.Advance(TimeSpan.FromSeconds(1));
         await queue.DoMaintenanceWorkAsync();
