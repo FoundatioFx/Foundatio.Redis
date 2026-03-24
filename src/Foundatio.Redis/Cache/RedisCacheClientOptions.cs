@@ -42,6 +42,7 @@ public class RedisCacheClientOptionsBuilder : SharedOptionsBuilder<RedisCacheCli
 
     public RedisCacheClientOptionsBuilder ReadMode(CommandFlags commandFlags)
     {
+        ValidateReadMode(commandFlags);
         Target.ReadMode = commandFlags;
         return this;
     }
@@ -55,5 +56,11 @@ public class RedisCacheClientOptionsBuilder : SharedOptionsBuilder<RedisCacheCli
 
         Target.Database = database;
         return this;
+    }
+
+    internal static void ValidateReadMode(CommandFlags flags)
+    {
+        if (flags is not (CommandFlags.None or CommandFlags.PreferReplica or CommandFlags.DemandReplica or CommandFlags.DemandMaster))
+            throw new ArgumentException($"ReadMode only accepts routing flags (None, PreferReplica, DemandReplica, DemandMaster). Got: {flags}", nameof(flags));
     }
 }

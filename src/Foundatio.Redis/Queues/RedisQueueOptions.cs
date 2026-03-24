@@ -1,4 +1,5 @@
 using System;
+using Foundatio.Caching;
 using StackExchange.Redis;
 
 namespace Foundatio.Queues;
@@ -79,6 +80,7 @@ public class RedisQueueOptionsBuilder<T> : SharedQueueOptionsBuilder<T, RedisQue
 
     public RedisQueueOptionsBuilder<T> ReadMode(CommandFlags commandFlags)
     {
+        RedisCacheClientOptionsBuilder.ValidateReadMode(commandFlags);
         Target.ReadMode = commandFlags;
         return this;
     }
