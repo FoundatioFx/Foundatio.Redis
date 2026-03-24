@@ -400,32 +400,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
         Assert.False(await db.KeyExistsAsync($"{listPrefix}:{id}:renewed"));
         Assert.Equal(1, await db.StringGetAsync($"{listPrefix}:{id}:attempts"));
         Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}:wait"));
-        var keyCount = await muxer.CountAllKeysAsync();
-        if (keyCount != 5)
-        {
-            try
-            {
-                const int maxKeysToLog = 50;
-                var server = muxer.GetEndPoints()
-                    .Select(ep => muxer.GetServer(ep))
-                    .FirstOrDefault(s => !s.IsReplica)
-                    ?? muxer.GetServer(muxer.GetEndPoints().First());
-
-                var allKeys = server.Keys(pattern: "*")
-                    .Take(maxKeysToLog)
-                    .Select(k => k.ToString())
-                    .ToList();
-                var keysSummary = string.Join(", ", allKeys);
-                if (keyCount > maxKeysToLog)
-                    keysSummary += $", ... (showing first {maxKeysToLog} of {keyCount} keys)";
-                _logger.LogError("Expected 5 keys but found {KeyCount}. Keys: {Keys}", keyCount, keysSummary);
-            }
-            catch (RedisException ex)
-            {
-                _logger.LogWarning(ex, "Failed to enumerate Redis keys for diagnostics when {KeyCount} keys were found instead of expected 5", keyCount);
-            }
-        }
-        Assert.Equal(5, keyCount);
+        Assert.Equal(5, await muxer.CountAllKeysAsync());
 
         timeProvider.Advance(TimeSpan.FromSeconds(1));
         await queue.DoMaintenanceWorkAsync();

@@ -836,13 +836,13 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
             }
         }
 
-        _cache.Dispose();
         WaitForMaintenanceTask();
+        _cache.Dispose();
     }
 
     private void WaitForMaintenanceTask()
     {
-        if (_maintenanceTask is null or { IsCompleted: true })
+        if (_maintenanceTask is null or { IsCompletedSuccessfully: true })
             return;
 
         try
