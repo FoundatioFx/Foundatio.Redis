@@ -1,5 +1,5 @@
 using System;
-using Foundatio.Caching;
+using Foundatio.Redis.Utility;
 using StackExchange.Redis;
 
 namespace Foundatio.Storage;
@@ -34,7 +34,7 @@ public class RedisFileStorageOptionsBuilder : SharedOptionsBuilder<RedisFileStor
 
     public RedisFileStorageOptionsBuilder ReadMode(CommandFlags commandFlags)
     {
-        RedisCacheClientOptionsBuilder.ValidateReadMode(commandFlags);
+        RedisOptionsValidation.ValidateReadMode(commandFlags);
         Target.ReadMode = commandFlags;
         return this;
     }

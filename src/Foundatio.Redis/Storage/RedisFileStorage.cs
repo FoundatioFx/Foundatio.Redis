@@ -158,7 +158,15 @@ public class RedisFileStorage : IFileStorage
 
         try
         {
-            var stream = await GetFileStreamAsync(normalizedPath, StreamMode.Read, cancellationToken).AnyContext();
+            // Always read from master: this is a read-then-delete flow; a stale replica read could cause data loss.
+            var fileContent = await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashGetAsync(_options.ContainerName, normalizedPath, CommandFlags.None), cancellationToken).AnyContext();
+            if (fileContent.IsNull)
+            {
+                _logger.LogError("Unable to rename {Path}: File Not Found", normalizedPath);
+                return false;
+            }
+
+            using var stream = new MemoryStream(fileContent);
             return await DeleteFileAsync(normalizedPath, cancellationToken).AnyContext() &&
                    await SaveFileAsync(normalizedNewPath, stream, cancellationToken).AnyContext();
         }
@@ -182,10 +190,15 @@ public class RedisFileStorage : IFileStorage
 
         try
         {
-            using var stream = await GetFileStreamAsync(normalizedPath, StreamMode.Read, cancellationToken).AnyContext();
-            if (stream == null)
+            // Always read from master: this is a read-before-write flow; a stale replica read would copy empty/stale data.
+            var fileContent = await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashGetAsync(_options.ContainerName, normalizedPath, CommandFlags.None), cancellationToken).AnyContext();
+            if (fileContent.IsNull)
+            {
+                _logger.LogError("Unable to copy {Path}: File Not Found", normalizedPath);
                 return false;
+            }
 
+            using var stream = new MemoryStream(fileContent);
             return await SaveFileAsync(normalizedTargetPath, stream, cancellationToken).AnyContext();
         }
         catch (Exception ex)

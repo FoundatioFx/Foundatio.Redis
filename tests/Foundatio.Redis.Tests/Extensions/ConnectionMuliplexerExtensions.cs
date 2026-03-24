@@ -41,9 +41,8 @@ public static class ConnectionMultiplexerExtensions
     public static List<string> GetAllKeys(this ConnectionMultiplexer muxer)
     {
         var keys = new List<string>();
-        foreach (var endpoint in muxer.GetEndPoints())
+        foreach (var server in muxer.GetEndPoints().Select(endpoint => muxer.GetServer(endpoint)))
         {
-            var server = muxer.GetServer(endpoint);
             if (!server.IsReplica)
                 keys.AddRange(server.Keys(pattern: "*").Select(k => k.ToString()));
         }
