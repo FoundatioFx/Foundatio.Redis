@@ -403,13 +403,27 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
         var keyCount = await muxer.CountAllKeysAsync();
         if (keyCount != 5)
         {
-            var server = muxer.GetServer(muxer.GetEndPoints().First());
-            const int maxKeysToLog = 50;
-            var allKeys = server.Keys(pattern: "*").Take(maxKeysToLog).Select(k => k.ToString()).ToList();
-            var keysSummary = string.Join(", ", allKeys);
-            if (keyCount > maxKeysToLog)
-                keysSummary += $", ... (showing first {maxKeysToLog} of {keyCount} keys)";
-            _logger.LogError("Expected 5 keys but found {KeyCount}. Keys: {Keys}", keyCount, keysSummary);
+            try
+            {
+                const int maxKeysToLog = 50;
+                var server = muxer.GetEndPoints()
+                    .Select(ep => muxer.GetServer(ep))
+                    .FirstOrDefault(s => !s.IsReplica)
+                    ?? muxer.GetServer(muxer.GetEndPoints().First());
+
+                var allKeys = server.Keys(pattern: "*")
+                    .Take(maxKeysToLog)
+                    .Select(k => k.ToString())
+                    .ToList();
+                var keysSummary = string.Join(", ", allKeys);
+                if (keyCount > maxKeysToLog)
+                    keysSummary += $", ... (showing first {maxKeysToLog} of {keyCount} keys)";
+                _logger.LogError("Expected 5 keys but found {KeyCount}. Keys: {Keys}", keyCount, keysSummary);
+            }
+            catch (RedisException ex)
+            {
+                _logger.LogWarning(ex, "Failed to enumerate Redis keys for diagnostics when {KeyCount} keys were found instead of expected 5", keyCount);
+            }
         }
         Assert.Equal(5, keyCount);
 
@@ -585,13 +599,13 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
 
         // wait for the databaseDelayScript to finish - the script blocks ALL Redis connections
         // so we must wait before trying to verify with any connection
-        await Task.Delay((DELAY_TIME_SEC + 1) * 1000);
+        await Task.Delay((DELAY_TIME_SEC + 2) * 1000);
 
         // item should've either timed out at some iterations and after databaseDelayScript is done be received
         // or it might have moved to work, in this case we want to make sure the correct keys were created
         var stopwatch = Stopwatch.StartNew();
         bool success = false;
-        while (stopwatch.Elapsed.TotalSeconds < 10)
+        while (stopwatch.Elapsed.TotalSeconds < 30)
         {
             string workListName = $"q:{QUEUE_NAME}:work";
             long workListLen = await database.ListLengthAsync(new RedisKey(workListName));

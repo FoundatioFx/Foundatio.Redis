@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using StackExchange.Redis;
 
@@ -7,31 +8,17 @@ public static class ConnectionMultiplexerExtensions
 {
     public static async Task FlushAllAsync(this ConnectionMultiplexer muxer)
     {
-        var endpoints = muxer.GetEndPoints();
-        if (endpoints.Length == 0)
-            return;
-
-        foreach (var endpoint in endpoints)
-        {
-            var server = muxer.GetServer(endpoint);
-            if (!server.IsReplica)
-                await server.FlushAllDatabasesAsync();
-        }
+        int database = muxer.GetDatabase().Database;
+        foreach (var server in muxer.GetEndPoints().Select(ep => muxer.GetServer(ep)).Where(s => !s.IsReplica))
+            await server.FlushDatabaseAsync(database);
     }
 
     public static async Task<long> CountAllKeysAsync(this ConnectionMultiplexer muxer)
     {
-        var endpoints = muxer.GetEndPoints();
-        if (endpoints.Length == 0)
-            return 0;
-
+        int database = muxer.GetDatabase().Database;
         long count = 0;
-        foreach (var endpoint in endpoints)
-        {
-            var server = muxer.GetServer(endpoint);
-            if (!server.IsReplica)
-                count += await server.DatabaseSizeAsync();
-        }
+        foreach (var server in muxer.GetEndPoints().Select(ep => muxer.GetServer(ep)).Where(s => !s.IsReplica))
+            count += await server.DatabaseSizeAsync(database);
 
         return count;
     }
