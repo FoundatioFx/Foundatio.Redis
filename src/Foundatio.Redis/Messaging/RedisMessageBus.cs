@@ -16,7 +16,7 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
 {
     private readonly AsyncLock _lock = new();
     private bool _isSubscribed;
-    private ChannelMessageQueue _channelMessageQueue;
+    private ChannelMessageQueue? _channelMessageQueue;
     private readonly RedisChannel _channel;
 
     public RedisMessageBus(RedisMessageBusOptions options) : base(options)
@@ -79,11 +79,17 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
         IMessage message;
         try
         {
-            var envelope = _serializer.Deserialize<RedisMessageEnvelope>((byte[])channelMessage.Message);
+            var envelope = _serializer.Deserialize<RedisMessageEnvelope>(((byte[]?)channelMessage.Message)!);
+            if (envelope is null)
+            {
+                _logger.LogWarning("OnMessage({Channel}) Deserialized envelope was null", channelMessage.Channel);
+                return;
+            }
+
             message = new Message(envelope.Data, DeserializeMessageBody)
             {
-                Type = envelope.Type,
-                ClrType = GetMappedMessageType(envelope.Type),
+                Type = envelope.Type ?? string.Empty,
+                ClrType = envelope.Type is not null ? GetMappedMessageType(envelope.Type) : null,
                 CorrelationId = envelope.CorrelationId,
                 UniqueId = envelope.UniqueId
             };
@@ -115,10 +121,13 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
 
     protected override async Task PublishImplAsync(string messageType, object message, MessageOptions options, CancellationToken cancellationToken)
     {
-        var mappedType = GetMappedMessageType(messageType);
         if (options.DeliveryDelay.HasValue && options.DeliveryDelay.Value > TimeSpan.Zero)
         {
+            var mappedType = GetMappedMessageType(messageType);
             _logger.LogTrace("Schedule delayed message: {MessageType} ({Delay}ms)", messageType, options.DeliveryDelay.Value.TotalMilliseconds);
+            if (mappedType is null)
+                throw new MessageBusException($"Unable to resolve CLR type for delayed message: {messageType}");
+
             SendDelayedMessage(mappedType, message, options);
             return;
         }
@@ -171,9 +180,9 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
 
 public class RedisMessageEnvelope
 {
-    public string UniqueId { get; set; }
-    public string CorrelationId { get; set; }
-    public string Type { get; set; }
-    public byte[] Data { get; set; }
+    public string? UniqueId { get; set; }
+    public string? CorrelationId { get; set; }
+    public string? Type { get; set; }
+    public byte[] Data { get; set; } = null!;
     public Dictionary<string, string> Properties { get; set; } = new Dictionary<string, string>();
 }

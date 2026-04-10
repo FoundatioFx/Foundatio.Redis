@@ -12,10 +12,10 @@ namespace Foundatio.SampleJobClient;
 
 public class Program
 {
-    private static IQueue<PingRequest> _queue;
-    private static IMessageBus _messageBus;
-    private static TestLogger _loggerFactory;
-    private static ILogger _logger;
+    private static IQueue<PingRequest> _queue = null!;
+    private static IMessageBus _messageBus = null!;
+    private static TestLogger _loggerFactory = null!;
+    private static ILogger _logger = null!;
     private static bool _isRunning = true;
     private static CancellationTokenSource _continuousEnqueueTokenSource = new();
 
@@ -212,12 +212,12 @@ public class Program
 
 public class EchoMessage
 {
-    public string Message { get; set; }
+    public string Message { get; set; } = null!;
 }
 
 public class PingRequest
 {
-    public string Data { get; set; }
+    public string Data { get; set; } = null!;
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public int PercentChanceOfException { get; set; } = 0;
 }

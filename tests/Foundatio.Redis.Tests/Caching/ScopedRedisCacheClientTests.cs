@@ -18,7 +18,7 @@ public class ScopedRedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
 
     protected override ICacheClient GetCacheClient(bool shouldThrowOnSerializationError = true)
     {
-        return new ScopedCacheClient(new RedisCacheClient(o => o.ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol)).LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError)), "scoped");
+        return new ScopedCacheClient(new RedisCacheClient(o => o.ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol)!).LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError)), "scoped");
     }
 
     [Fact]
@@ -283,7 +283,7 @@ public class ScopedRedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     [InlineData("s", 1)] // Partial prefix match
     [InlineData(null, 1)] // Null prefix (all keys in scope)
     [InlineData("", 1)] // Empty prefix (all keys in scope)
-    public override Task RemoveByPrefixAsync_FromScopedCache_RemovesOnlyScopedKeys(string prefixToRemove, int expectedRemovedCount)
+    public override Task RemoveByPrefixAsync_FromScopedCache_RemovesOnlyScopedKeys(string? prefixToRemove, int expectedRemovedCount)
     {
         return base.RemoveByPrefixAsync_FromScopedCache_RemovesOnlyScopedKeys(prefixToRemove, expectedRemovedCount);
     }
@@ -291,7 +291,7 @@ public class ScopedRedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    public override Task RemoveByPrefixAsync_NullOrEmptyPrefixWithScopedCache_RemovesCorrectKeys(string prefix)
+    public override Task RemoveByPrefixAsync_NullOrEmptyPrefixWithScopedCache_RemovesCorrectKeys(string? prefix)
     {
         return base.RemoveByPrefixAsync_NullOrEmptyPrefixWithScopedCache_RemovesCorrectKeys(prefix);
     }
@@ -585,7 +585,7 @@ public class ScopedRedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         return new ValueTask(muxer.FlushAllAsync());
     }
 

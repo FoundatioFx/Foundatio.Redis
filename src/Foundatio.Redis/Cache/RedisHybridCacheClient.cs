@@ -1,9 +1,9 @@
-﻿using Foundatio.Messaging;
+using Foundatio.Messaging;
 namespace Foundatio.Caching;
 
 public class RedisHybridCacheClient : HybridCacheClient
 {
-    public RedisHybridCacheClient(RedisHybridCacheClientOptions options, InMemoryCacheClientOptions localOptions = null)
+    public RedisHybridCacheClient(RedisHybridCacheClientOptions options, InMemoryCacheClientOptions? localOptions = null)
         : base(new RedisCacheClient(o => o
                 .ConnectionMultiplexer(options.ConnectionMultiplexer)
                 .Serializer(options.Serializer)
@@ -20,7 +20,7 @@ public class RedisHybridCacheClient : HybridCacheClient
     }
 
     public RedisHybridCacheClient(Builder<RedisHybridCacheClientOptionsBuilder, RedisHybridCacheClientOptions> config,
-        Builder<InMemoryCacheClientOptionsBuilder, InMemoryCacheClientOptions> localConfig = null)
+        Builder<InMemoryCacheClientOptionsBuilder, InMemoryCacheClientOptions>? localConfig = null)
         : this(config(new RedisHybridCacheClientOptionsBuilder()).Build(),
             localConfig?.Invoke(new InMemoryCacheClientOptionsBuilder()).Build())
     {

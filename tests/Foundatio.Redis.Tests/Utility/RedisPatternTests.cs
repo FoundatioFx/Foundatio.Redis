@@ -9,10 +9,10 @@ public class RedisPatternTests
     public void Escape_WithNullInput_ReturnsNull()
     {
         // Arrange
-        string input = null;
+        string? input = null;
 
         // Act
-        string result = RedisPattern.Escape(input);
+        string? result = RedisPattern.Escape(input!);
 
         // Assert
         Assert.Null(result);

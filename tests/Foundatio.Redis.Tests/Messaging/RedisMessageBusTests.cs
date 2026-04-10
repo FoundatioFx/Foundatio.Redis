@@ -25,11 +25,11 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
     {
     }
 
-    protected override IMessageBus GetMessageBus(Func<SharedMessageBusOptions, SharedMessageBusOptions> config = null)
+    protected override IMessageBus GetMessageBus(Func<SharedMessageBusOptions, SharedMessageBusOptions>? config = null)
     {
         return new RedisMessageBus(o =>
         {
-            o.Subscriber(SharedConnection.GetMuxer(Log, Protocol).GetSubscriber());
+            o.Subscriber(SharedConnection.GetMuxer(Log, Protocol)!.GetSubscriber());
             o.Topic(_topic);
             o.LoggerFactory(Log);
             if (config != null)
@@ -192,7 +192,7 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
     [Fact]
     public async Task CanDisposeCacheAndQueueAndReceiveSubscribedMessages()
     {
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         var messageBus1 = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
 
         var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer });
@@ -239,7 +239,7 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         return new ValueTask(muxer.FlushAllAsync());
     }
 

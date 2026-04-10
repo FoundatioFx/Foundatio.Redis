@@ -6,7 +6,7 @@ namespace Foundatio.Storage;
 
 public class RedisFileStorageOptions : SharedOptions
 {
-    public IConnectionMultiplexer ConnectionMultiplexer { get; set; }
+    public IConnectionMultiplexer ConnectionMultiplexer { get; set; } = null!;
     public string ContainerName { get; set; } = "storage";
 
     /// <summary>

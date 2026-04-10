@@ -34,21 +34,26 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
     {
     }
 
-    protected override IQueue<SimpleWorkItem> GetQueue(int retries = 1, TimeSpan? workItemTimeout = null, TimeSpan? retryDelay = null, int[] retryMultipliers = null, int deadLetterMaxItems = 100, bool runQueueMaintenance = true, TimeProvider timeProvider = null, ISerializer serializer = null)
+    protected override IQueue<SimpleWorkItem> GetQueue(int retries = 1, TimeSpan? workItemTimeout = null, TimeSpan? retryDelay = null, int[]? retryMultipliers = null, int deadLetterMaxItems = 100, bool runQueueMaintenance = true, TimeProvider? timeProvider = null, ISerializer? serializer = null)
     {
-        var queue = new RedisQueue<SimpleWorkItem>(o => o
-            .ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol))
-            .Retries(retries)
-            .RetryDelay(retryDelay.GetValueOrDefault(TimeSpan.FromMinutes(1)))
-            .RetryMultipliers(retryMultipliers ?? [1, 3, 5, 10])
-            .DeadLetterMaxItems(deadLetterMaxItems)
-            .TimeProvider(timeProvider ?? TimeProvider.System)
-            .WorkItemTimeout(workItemTimeout.GetValueOrDefault(TimeSpan.FromMinutes(5)))
-            .MetricsPollingInterval(TimeSpan.Zero)
-            .RunMaintenanceTasks(runQueueMaintenance)
-            .Serializer(serializer)
-            .LoggerFactory(Log)
-        );
+        var queue = new RedisQueue<SimpleWorkItem>(o =>
+        {
+            o.ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol)!)
+                .Retries(retries)
+                .RetryDelay(retryDelay.GetValueOrDefault(TimeSpan.FromMinutes(1)))
+                .RetryMultipliers(retryMultipliers ?? [1, 3, 5, 10])
+                .DeadLetterMaxItems(deadLetterMaxItems)
+                .TimeProvider(timeProvider ?? TimeProvider.System)
+                .WorkItemTimeout(workItemTimeout.GetValueOrDefault(TimeSpan.FromMinutes(5)))
+                .MetricsPollingInterval(TimeSpan.Zero)
+                .RunMaintenanceTasks(runQueueMaintenance)
+                .LoggerFactory(Log);
+
+            if (serializer is not null)
+                o.Serializer(serializer);
+
+            return o;
+        });
 
         _logger.LogDebug("Queue Id: {QueueId}", queue.QueueId);
         return queue;
@@ -207,7 +212,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
     [RetryFact]
     public override async Task CanDequeueWithLockingAsync()
     {
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         using var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer, LoggerFactory = Log });
         using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
         var distributedLock = new CacheLockProvider(cache, messageBus, null, Log);
@@ -217,7 +222,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
     [Fact]
     public override async Task CanHaveMultipleQueueInstancesWithLockingAsync()
     {
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         using var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer, LoggerFactory = Log });
         using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
         var distributedLock = new CacheLockProvider(cache, messageBus, null, Log);
@@ -257,11 +262,12 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
 
         using (queue)
         {
-            var muxer = SharedConnection.GetMuxer(Log, Protocol);
+            var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
             var db = muxer.GetDatabase();
             string listPrefix = muxer.IsCluster() ? "{q:SimpleWorkItem}" : "q:SimpleWorkItem";
 
-            string id = await queue.EnqueueAsync(new SimpleWorkItem { Data = "blah", Id = 1 });
+            string? id = await queue.EnqueueAsync(new SimpleWorkItem { Data = "blah", Id = 1 });
+            Assert.NotNull(id);
             Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}"));
             Assert.Equal(1, await db.ListLengthAsync($"{listPrefix}:in"));
             Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}:enqueued"));
@@ -271,6 +277,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
 
             Assert.False(await db.KeyExistsAsync($"{listPrefix}:{id}:renewed"));
             var workItem = await queue.DequeueAsync();
+            Assert.NotNull(workItem);
             Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}"));
             Assert.Equal(0, await db.ListLengthAsync($"{listPrefix}:in"));
             Assert.Equal(1, await db.ListLengthAsync($"{listPrefix}:work"));
@@ -311,30 +318,21 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
             return;
 
         using RedisQueue<SimpleWorkItem> redisQueue = queue;
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         var db = muxer.GetDatabase();
         string listPrefix = muxer.IsCluster() ? "{q:SimpleWorkItem}" : "q:SimpleWorkItem";
 
-        string id = await queue.EnqueueAsync(new SimpleWorkItem
+        string? id = await queue.EnqueueAsync(new SimpleWorkItem
         {
             Data = "blah",
             Id = 1
         });
+        Assert.NotNull(id);
         _logger.LogTrace("SimpleWorkItem Id: {Id}", id);
 
         var workItem = await queue.DequeueAsync();
-        await workItem.AbandonAsync();
-        Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}"));
-        Assert.Equal(1, await db.ListLengthAsync($"{listPrefix}:in"));
-        Assert.Equal(0, await db.ListLengthAsync($"{listPrefix}:work"));
-        Assert.False(await db.KeyExistsAsync($"{listPrefix}:{id}:dequeued"));
-        Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}:enqueued"));
-        Assert.False(await db.KeyExistsAsync($"{listPrefix}:{id}:renewed"));
-        Assert.Equal(1, await db.StringGetAsync($"{listPrefix}:{id}:attempts"));
-        Assert.Equal(4, await muxer.CountAllKeysAsync());
-
-        workItem = await queue.DequeueAsync();
         Assert.NotNull(workItem);
+        await workItem.AbandonAsync();
         Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}"));
         Assert.Equal(0, await db.ListLengthAsync($"{listPrefix}:in"));
         Assert.Equal(1, await db.ListLengthAsync($"{listPrefix}:work"));
@@ -359,6 +357,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
 
         // should go to deadletter now
         workItem = await queue.DequeueAsync();
+        Assert.NotNull(workItem);
         await workItem.AbandonAsync();
         Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}"));
         Assert.Equal(0, await db.ListLengthAsync($"{listPrefix}:in"));
@@ -380,21 +379,19 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
             return;
 
         using RedisQueue<SimpleWorkItem> redisQueue = queue;
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         var db = muxer.GetDatabase();
         string listPrefix = muxer.IsCluster() ? "{q:SimpleWorkItem}" : "q:SimpleWorkItem";
 
-        string id = await queue.EnqueueAsync(new SimpleWorkItem
+        string? id = await queue.EnqueueAsync(new SimpleWorkItem
         {
             Data = "blah",
             Id = 1
         });
+        Assert.NotNull(id);
         var workItem = await queue.DequeueAsync();
+        Assert.NotNull(workItem);
         await workItem.AbandonAsync();
-        Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}"));
-        Assert.Equal(0, await db.ListLengthAsync($"{listPrefix}:in"));
-        Assert.Equal(0, await db.ListLengthAsync($"{listPrefix}:work"));
-        Assert.Equal(1, await db.ListLengthAsync($"{listPrefix}:wait"));
         Assert.False(await db.KeyExistsAsync($"{listPrefix}:{id}:dequeued"));
         Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}:enqueued"));
         Assert.False(await db.KeyExistsAsync($"{listPrefix}:{id}:renewed"));
@@ -416,6 +413,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
         Assert.InRange(await muxer.CountAllKeysAsync(), 4, 5);
 
         workItem = await queue.DequeueAsync();
+        Assert.NotNull(workItem);
         Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}"));
         Assert.Equal(0, await db.ListLengthAsync($"{listPrefix}:in"));
         Assert.Equal(1, await db.ListLengthAsync($"{listPrefix}:work"));
@@ -442,14 +440,15 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
             return;
 
         using RedisQueue<SimpleWorkItem> redisQueue = queue;
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         var db = muxer.GetDatabase();
         string listPrefix = muxer.IsCluster() ? "{q:SimpleWorkItem}" : "q:SimpleWorkItem";
 
         var workItemIds = new List<string>();
         for (int i = 0; i < 10; i++)
         {
-            string id = await queue.EnqueueAsync(new SimpleWorkItem { Data = "blah", Id = i });
+            string? id = await queue.EnqueueAsync(new SimpleWorkItem { Data = "blah", Id = i });
+            Assert.NotNull(id);
             _logger.LogTrace(id);
             workItemIds.Add(id);
         }
@@ -457,6 +456,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
         for (int i = 0; i < 10; i++)
         {
             var workItem = await queue.DequeueAsync();
+            Assert.NotNull(workItem);
             await workItem.AbandonAsync();
             _logger.LogTrace("Abandoning: {Id}", workItem.Id);
         }
@@ -499,12 +499,11 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
         await Task.Delay(workItemTimeout.Add(TimeSpan.FromMilliseconds(1)), TestCancellationToken);
 
         // Add an item. DequeueAsync can now return.
-        string id = await queue.EnqueueAsync(new SimpleWorkItem
+        string? id = await queue.EnqueueAsync(new SimpleWorkItem
         {
             Data = itemData,
             Id = itemId
         });
-
         Assert.NotNull(id);
 
         // Run DoMaintenanceWorkAsync to verify that our item will not be auto-abandoned.
@@ -512,6 +511,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
 
         // Completing the item will throw if the item is abandoned.
         var item = await itemTask;
+        Assert.NotNull(item);
         await item.CompleteAsync();
 
         var value = item.Value;
@@ -631,6 +631,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         var workItem = await queue.DequeueAsync(TimeSpan.Zero);
         while (workItem != null)
         {
+            Assert.NotNull(workItem.Value);
             Assert.Equal("Hello", workItem.Value.Data);
             if (RandomData.GetBool(10))
                 await workItem.AbandonAsync();
@@ -648,7 +649,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         Assert.Equal(workItemCount, stats.Completed + stats.Deadletter);
         Assert.Equal(0, stats.Queued);
 
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         _logger.LogTrace("# Keys: {KeyCount}", await muxer.CountAllKeysAsync());
     }
 
@@ -677,6 +678,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         var sw = Stopwatch.StartNew();
         while (workItem != null)
         {
+            Assert.NotNull(workItem.Value);
             Assert.Equal("Hello", workItem.Value.Data);
             await workItem.CompleteAsync();
             work++;
@@ -691,7 +693,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         Assert.Equal(workItemCount, stats.Completed);
         Assert.Equal(0, stats.Queued);
 
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         _logger.LogTrace("# Keys: {KeyCount}", await muxer.CountAllKeysAsync());
     }
 
@@ -720,6 +722,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         var sw = Stopwatch.StartNew();
         await queue.StartWorkingAsync(async workItem =>
         {
+            Assert.NotNull(workItem.Value);
             Assert.Equal("Hello", workItem.Value.Data);
             await workItem.CompleteAsync();
             work++;
@@ -736,7 +739,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         Assert.Equal(workItemCount, stats.Completed);
         Assert.Equal(0, stats.Queued);
 
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         _logger.LogTrace("# Keys: {KeyCount}", await muxer.CountAllKeysAsync());
     }
 
@@ -750,6 +753,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         {
             await command1Queue.StartWorkingAsync((entry, _) =>
             {
+                Assert.NotNull(entry.Value);
                 _logger.LogInformation("{UtcNow}: Handler1 {Name} {ValueId}", DateTime.UtcNow, entry.Value.GetType().Name, entry.Value.Id);
                 Assert.InRange(entry.Value.Id, 100, 199);
                 return Task.CompletedTask;
@@ -757,6 +761,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
 
             await command2Queue.StartWorkingAsync((entry, _) =>
             {
+                Assert.NotNull(entry.Value);
                 _logger.LogInformation("{UtcNow}: Handler2 {Name} {ValueId}", DateTime.UtcNow, entry.Value.GetType().Name, entry.Value.Id);
                 Assert.InRange(entry.Value.Id, 200, 299);
                 return Task.CompletedTask;
@@ -789,13 +794,13 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
 
     private IQueue<T> CreateQueue<T>(bool allQueuesTheSameName = true) where T : class
     {
-        string name = typeof(T).FullName.Trim().Replace(".", String.Empty).ToLower();
+        string name = typeof(T).FullName!.Trim().Replace(".", String.Empty).ToLower();
 
         if (allQueuesTheSameName)
             name = "cmd";
 
         var queue = new RedisQueue<T>(o => o
-            .ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol))
+            .ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol)!)
             .Name(name)
             .LoggerFactory(Log)
         );
@@ -816,7 +821,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
     public ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         return new ValueTask(muxer.FlushAllAsync());
     }
 

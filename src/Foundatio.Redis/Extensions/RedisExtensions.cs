@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using Foundatio.Extensions;
 using Foundatio.Serializer;
 using Foundatio.Utility;
@@ -10,17 +11,18 @@ internal static class RedisValueExtensions
 {
     private static readonly RedisValue _nullValue = "@@NULL";
 
+    [return: MaybeNull]
     public static T ToValueOfType<T>(this RedisValue redisValue, ISerializer serializer)
     {
         T value;
         var type = typeof(T);
 
         if (type == TypeHelper.BoolType || type == TypeHelper.StringType || type.IsNumeric())
-            value = (T)Convert.ChangeType(redisValue, type);
+            value = (T)Convert.ChangeType(redisValue, type)!;
         else if (type == TypeHelper.NullableBoolType || type.IsNullableNumeric())
-            value = redisValue.IsNull ? default : (T)Convert.ChangeType(redisValue, Nullable.GetUnderlyingType(type));
+            value = redisValue.IsNull ? default! : (T)Convert.ChangeType(redisValue, Nullable.GetUnderlyingType(type)!)!;
         else
-            return serializer.Deserialize<T>((byte[])redisValue);
+            return serializer.Deserialize<T>(((byte[]?)redisValue)!);
 
         return value;
     }

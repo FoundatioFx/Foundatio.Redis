@@ -64,7 +64,7 @@ public class QueueBenchmarks
             for (int i = 0; i < ITEM_COUNT; i++)
             {
                 var entry = queue.DequeueAsync(TimeSpan.Zero).GetAwaiter().GetResult();
-                entry.CompleteAsync().GetAwaiter().GetResult();
+                entry?.CompleteAsync().GetAwaiter().GetResult();
             }
         }
         catch (Exception ex)

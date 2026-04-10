@@ -18,7 +18,7 @@ public class RedisFileStorageTests : FileStorageTestsBase, IAsyncLifetime
 
     protected override IFileStorage GetStorage()
     {
-        return new RedisFileStorage(o => o.ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol)).LoggerFactory(Log));
+        return new RedisFileStorage(o => o.ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol)!).LoggerFactory(Log));
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public class RedisFileStorageTests : FileStorageTestsBase, IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         await muxer.FlushAllAsync();
     }
 

@@ -29,13 +29,13 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     private bool _scriptsLoaded;
     private bool? _supportsMsetEx;
 
-    private LoadedLuaScript _incrementWithExpire;
-    private LoadedLuaScript _removeIfEqual;
-    private LoadedLuaScript _replaceIfEqual;
-    private LoadedLuaScript _setIfHigher;
-    private LoadedLuaScript _setIfLower;
-    private LoadedLuaScript _getAllExpiration;
-    private LoadedLuaScript _setAllExpiration;
+    private LoadedLuaScript _incrementWithExpire = null!;
+    private LoadedLuaScript _removeIfEqual = null!;
+    private LoadedLuaScript _replaceIfEqual = null!;
+    private LoadedLuaScript _setIfHigher = null!;
+    private LoadedLuaScript _setIfLower = null!;
+    private LoadedLuaScript _getAllExpiration = null!;
+    private LoadedLuaScript _setAllExpiration = null!;
 
     public RedisCacheClient(RedisCacheClientOptions options)
     {
@@ -77,7 +77,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         return result > 0;
     }
 
-    public async Task<int> RemoveAllAsync(IEnumerable<string> keys = null)
+    public async Task<int> RemoveAllAsync(IEnumerable<string>? keys = null)
     {
         // NOTE: Batch size matches default page size (RedisBase.CursorUtils.DefaultLibraryPageSize)
         int batchSize = 250;
@@ -252,7 +252,8 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             try
             {
                 var value = redisValue.ToValueOfType<T>(_options.Serializer);
-                result.Add(value);
+                if (value is not null)
+                    result.Add(value);
             }
             catch (Exception ex)
             {
@@ -276,7 +277,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         try
         {
             var value = redisValue.ToValueOfType<T>(_options.Serializer);
-            return new CacheValue<T>(value, true);
+            return value is not null ? new CacheValue<T>(value, true) : CacheValue<T>.Null;
         }
         catch (Exception ex)
         {
@@ -315,7 +316,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 // Non-existent keys return nil/empty values in their respective positions.
                 // https://redis.io/commands/mget
                 for (int i = 0; i < hashSlotKeys.Length; i++)
-                    result[hashSlotKeys[i]] = RedisValueToCacheValue<T>(values[i]);
+                    result[((string?)hashSlotKeys[i])!] = RedisValueToCacheValue<T>(values[i]);
             }
 
             return result.AsReadOnly();
@@ -327,13 +328,13 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
             // Redis MGET guarantees that values are returned in the same order as keys
             for (int i = 0; i < redisKeys.Count; i++)
-                result[redisKeys[i]] = RedisValueToCacheValue<T>(values[i]);
+                result[((string?)redisKeys[i])!] = RedisValueToCacheValue<T>(values[i]);
 
             return result.AsReadOnly();
         }
     }
 
-    public async Task<CacheValue<ICollection<T>>> GetListAsync<T>(string key, int? page = null, int pageSize = 100)
+    public async Task<CacheValue<ICollection<T>>> GetListAsync<T>(string key, int? page = null, int pageSize = 100) where T : notnull
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
 
@@ -369,7 +370,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         return InternalSetAsync(key, value, expiresIn, When.NotExists);
     }
 
-    public async Task<long> ListAddAsync<T>(string key, IEnumerable<T> values, TimeSpan? expiresIn = null)
+    public async Task<long> ListAddAsync<T>(string key, IEnumerable<T> values, TimeSpan? expiresIn = null) where T : notnull
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentNullException.ThrowIfNull(values);
@@ -402,7 +403,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         return added;
     }
 
-    public async Task<long> ListRemoveAsync<T>(string key, IEnumerable<T> values)
+    public async Task<long> ListRemoveAsync<T>(string key, IEnumerable<T> values) where T : notnull
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
         ArgumentNullException.ThrowIfNull(values);
@@ -450,7 +451,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         await SetExpirationAsync(key, expiresIn).AnyContext();
     }
 
-    private async Task RemoveExpiredListValuesAsync<T>(string key, bool isStringValues)
+    private async Task RemoveExpiredListValuesAsync<T>(string key, bool isStringValues) where T : notnull
     {
         try
         {
@@ -468,7 +469,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         }
     }
 
-    private async Task MigrateLegacySetToSortedSetForKeyAsync<T>(string key, bool isStringValues)
+    private async Task MigrateLegacySetToSortedSetForKeyAsync<T>(string key, bool isStringValues) where T : notnull
     {
         // convert legacy set to sorted set
         var oldItems = await Database.SetMembersAsync(key).AnyContext();
@@ -858,13 +859,13 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 //   -2 = Key does not exist
                 //   -1 = Key exists but has no associated expiration
                 //   Positive integer = Remaining TTL in milliseconds
-                long[] ttls = (long[])redisResult;
+                long[]? ttls = (long[]?)redisResult;
                 if (ttls is null || ttls.Length != hashSlotKeys.Length)
                     throw new InvalidOperationException($"Script returned {ttls?.Length ?? 0} results for {hashSlotKeys.Length} keys");
 
                 for (int hashSlotIndex = 0; hashSlotIndex < hashSlotKeys.Length; hashSlotIndex++)
                 {
-                    string key = hashSlotKeys[hashSlotIndex];
+                    string key = ((string?)hashSlotKeys[hashSlotIndex])!;
                     long ttl = ttls[hashSlotIndex];
                     if (ttl == -2) // Key doesn't exist - omit from result
                         continue;
@@ -890,14 +891,14 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             //   -2 = Key does not exist
             //   -1 = Key exists but has no associated expiration
             //   Positive integer = Remaining TTL in milliseconds
-            long[] ttls = (long[])redisResult;
+            long[]? ttls = (long[]?)redisResult;
             if (ttls is null || ttls.Length != redisKeys.Length)
                 throw new InvalidOperationException($"Script returned {ttls?.Length ?? 0} results for {redisKeys.Length} keys");
 
             var result = new Dictionary<string, TimeSpan?>();
             for (int keyIndex = 0; keyIndex < redisKeys.Length; keyIndex++)
             {
-                string key = redisKeys[keyIndex];
+                string key = ((string?)redisKeys[keyIndex])!;
                 long ttl = ttls[keyIndex];
                 if (ttl == -2) // Key doesn't exist - omit from result
                     continue;
@@ -984,14 +985,14 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         }
     }
 
-    private void ConnectionMultiplexerOnConnectionRestored(object sender, ConnectionFailedEventArgs connectionFailedEventArgs)
+    private void ConnectionMultiplexerOnConnectionRestored(object? sender, ConnectionFailedEventArgs connectionFailedEventArgs)
     {
         _logger.LogInformation("Redis connection restored");
         _scriptsLoaded = false;
         _supportsMsetEx = null; // Re-check version on next call
     }
 
-    private void ConnectionMultiplexerOnConnectionFailed(object sender, ConnectionFailedEventArgs connectionFailedEventArgs)
+    private void ConnectionMultiplexerOnConnectionFailed(object? sender, ConnectionFailedEventArgs connectionFailedEventArgs)
     {
         _logger.LogWarning("Redis connection failed: {FailureType}", connectionFailedEventArgs.FailureType);
     }

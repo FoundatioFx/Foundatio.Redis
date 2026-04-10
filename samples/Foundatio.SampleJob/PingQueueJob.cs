@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Exceptionless;
@@ -26,9 +26,9 @@ public class PingQueueJob : QueueJobBase<PingRequest>
 
     public int RunCount => _runCount;
 
-    protected override Task<ILock> GetQueueEntryLockAsync(IQueueEntry<PingRequest> queueEntry, CancellationToken cancellationToken = new CancellationToken())
+    protected override Task<ILock?> GetQueueEntryLockAsync(IQueueEntry<PingRequest> queueEntry, CancellationToken cancellationToken = new CancellationToken())
     {
-        return _locker.AcquireAsync(String.Concat("pull:", queueEntry.Value.Id),
+        return _locker.AcquireAsync(String.Concat("pull:", queueEntry.Value?.Id),
             TimeSpan.FromMinutes(30),
             TimeSpan.FromSeconds(1));
     }
@@ -40,7 +40,7 @@ public class PingQueueJob : QueueJobBase<PingRequest>
         _logger.LogInformation("Got {RunCount} ping. Sending pong!", RunCount.ToOrdinal());
         await Task.Delay(TimeSpan.FromMilliseconds(1)).AnyContext();
 
-        if (RandomData.GetBool(context.QueueEntry.Value.PercentChanceOfException))
+        if (RandomData.GetBool(context.QueueEntry.Value?.PercentChanceOfException ?? 0))
             throw new ApplicationException("Boom!");
 
         return JobResult.Success;
@@ -49,7 +49,7 @@ public class PingQueueJob : QueueJobBase<PingRequest>
 
 public class PingRequest
 {
-    public string Data { get; set; }
-    public string Id { get; set; }
+    public string Data { get; set; } = null!;
+    public string Id { get; set; } = null!;
     public int PercentChanceOfException { get; set; } = 0;
 }
