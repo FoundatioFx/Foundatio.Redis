@@ -40,8 +40,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
 
     public RedisQueue(RedisQueueOptions<T> options) : base(options)
     {
-        if (options.ConnectionMultiplexer == null)
-            throw new ArgumentException("ConnectionMultiplexer is required.");
+        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer);
 
         options.ConnectionMultiplexer.ConnectionRestored += ConnectionMultiplexerOnConnectionRestored;
 

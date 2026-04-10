@@ -24,8 +24,7 @@ public class RedisFileStorage : IFileStorage
 
     public RedisFileStorage(RedisFileStorageOptions options)
     {
-        if (options.ConnectionMultiplexer == null)
-            throw new ArgumentException("ConnectionMultiplexer is required.");
+        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer);
 
         _serializer = options.Serializer ?? DefaultSerializer.Instance;
         _logger = options.LoggerFactory?.CreateLogger(GetType()) ?? NullLogger.Instance;
