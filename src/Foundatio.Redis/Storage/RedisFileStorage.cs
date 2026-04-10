@@ -64,11 +64,14 @@ public class RedisFileStorage : IFileStorage
         if (streamMode is StreamMode.Write)
             throw new NotSupportedException($"Stream mode {streamMode} is not supported.");
 
-        return await GetFileContentStreamAsync(NormalizePath(path)!, _options.ReadMode, cancellationToken).AnyContext();
+        return await GetFileContentStreamAsync(NormalizePath(path), _options.ReadMode, cancellationToken).AnyContext();
     }
 
-    private async Task<MemoryStream?> GetFileContentStreamAsync(string normalizedPath, CommandFlags flags, CancellationToken cancellationToken = default)
+    private async Task<MemoryStream?> GetFileContentStreamAsync(string? normalizedPath, CommandFlags flags, CancellationToken cancellationToken = default)
     {
+        if (String.IsNullOrEmpty(normalizedPath))
+            return null;
+
         _logger.LogTrace("Getting file stream for {Path}", normalizedPath);
 
         var fileContent = await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashGetAsync(_options.ContainerName, normalizedPath, flags), cancellationToken).AnyContext();
@@ -86,7 +89,10 @@ public class RedisFileStorage : IFileStorage
         if (String.IsNullOrEmpty(path))
             throw new ArgumentNullException(nameof(path));
 
-        string normalizedPath = NormalizePath(path)!;
+        string? normalizedPath = NormalizePath(path);
+        if (normalizedPath is null)
+            return null;
+
         _logger.LogTrace("Getting file info for {Path}", normalizedPath);
 
         var fileSpec = await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashGetAsync(_fileSpecContainer, normalizedPath, _options.ReadMode)).AnyContext();
@@ -104,7 +110,10 @@ public class RedisFileStorage : IFileStorage
         if (String.IsNullOrEmpty(path))
             throw new ArgumentNullException(nameof(path));
 
-        string normalizedPath = NormalizePath(path)!;
+        string? normalizedPath = NormalizePath(path);
+        if (normalizedPath is null)
+            return false;
+
         _logger.LogTrace("Checking if {Path} exists", normalizedPath);
 
         return await _resiliencePolicy.ExecuteAsync(async _ => await Database.HashExistsAsync(_fileSpecContainer, normalizedPath, _options.ReadMode)).AnyContext();
@@ -117,7 +126,10 @@ public class RedisFileStorage : IFileStorage
         if (stream == null)
             throw new ArgumentNullException(nameof(stream));
 
-        string normalizedPath = NormalizePath(path)!;
+        string? normalizedPath = NormalizePath(path);
+        if (normalizedPath is null)
+            return false;
+
         _logger.LogTrace("Saving {Path}", normalizedPath);
 
         try
@@ -158,8 +170,11 @@ public class RedisFileStorage : IFileStorage
         if (String.IsNullOrEmpty(newPath))
             throw new ArgumentNullException(nameof(newPath));
 
-        string normalizedPath = NormalizePath(path)!;
-        string normalizedNewPath = NormalizePath(newPath)!;
+        string? normalizedPath = NormalizePath(path);
+        string? normalizedNewPath = NormalizePath(newPath);
+        if (normalizedPath is null || normalizedNewPath is null)
+            return false;
+
         _logger.LogInformation("Renaming {Path} to {NewPath}", normalizedPath, normalizedNewPath);
 
         try
@@ -189,8 +204,11 @@ public class RedisFileStorage : IFileStorage
         if (String.IsNullOrEmpty(targetPath))
             throw new ArgumentNullException(nameof(targetPath));
 
-        string normalizedPath = NormalizePath(path)!;
-        string normalizedTargetPath = NormalizePath(targetPath)!;
+        string? normalizedPath = NormalizePath(path);
+        string? normalizedTargetPath = NormalizePath(targetPath);
+        if (normalizedPath is null || normalizedTargetPath is null)
+            return false;
+
         _logger.LogInformation("Copying {Path} to {TargetPath}", normalizedPath, normalizedTargetPath);
 
         try
@@ -217,7 +235,10 @@ public class RedisFileStorage : IFileStorage
         if (String.IsNullOrEmpty(path))
             throw new ArgumentNullException(nameof(path));
 
-        string normalizedPath = NormalizePath(path)!;
+        string? normalizedPath = NormalizePath(path);
+        if (normalizedPath is null)
+            return false;
+
         _logger.LogTrace("Deleting {Path}", normalizedPath);
 
         var database = Database;
@@ -342,7 +363,10 @@ public class RedisFileStorage : IFileStorage
         if (String.IsNullOrEmpty(searchPattern))
             return new SearchCriteria { Prefix = String.Empty };
 
-        string normalizedSearchPattern = NormalizePath(searchPattern)!;
+        string? normalizedSearchPattern = NormalizePath(searchPattern);
+        if (normalizedSearchPattern is null)
+            return new SearchCriteria { Prefix = String.Empty };
+
         int wildcardPos = normalizedSearchPattern.IndexOf('*');
         bool hasWildcard = wildcardPos >= 0;
 

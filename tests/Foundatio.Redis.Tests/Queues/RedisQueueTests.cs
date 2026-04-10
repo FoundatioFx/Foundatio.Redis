@@ -36,24 +36,19 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
 
     protected override IQueue<SimpleWorkItem> GetQueue(int retries = 1, TimeSpan? workItemTimeout = null, TimeSpan? retryDelay = null, int[]? retryMultipliers = null, int deadLetterMaxItems = 100, bool runQueueMaintenance = true, TimeProvider? timeProvider = null, ISerializer? serializer = null)
     {
-        var queue = new RedisQueue<SimpleWorkItem>(o =>
-        {
-            o.ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol))
-                .Retries(retries)
-                .RetryDelay(retryDelay.GetValueOrDefault(TimeSpan.FromMinutes(1)))
-                .RetryMultipliers(retryMultipliers ?? [1, 3, 5, 10])
-                .DeadLetterMaxItems(deadLetterMaxItems)
-                .TimeProvider(timeProvider ?? TimeProvider.System)
-                .WorkItemTimeout(workItemTimeout.GetValueOrDefault(TimeSpan.FromMinutes(5)))
-                .MetricsPollingInterval(TimeSpan.Zero)
-                .RunMaintenanceTasks(runQueueMaintenance)
-                .LoggerFactory(Log);
-
-            if (serializer is not null)
-                o.Serializer(serializer);
-
-            return o;
-        });
+        var queue = new RedisQueue<SimpleWorkItem>(o => o
+            .ConnectionMultiplexer(SharedConnection.GetRequiredMuxer(Log, Protocol))
+            .Retries(retries)
+            .RetryDelay(retryDelay.GetValueOrDefault(TimeSpan.FromMinutes(1)))
+            .RetryMultipliers(retryMultipliers ?? [1, 3, 5, 10])
+            .DeadLetterMaxItems(deadLetterMaxItems)
+            .TimeProvider(timeProvider ?? TimeProvider.System)
+            .WorkItemTimeout(workItemTimeout.GetValueOrDefault(TimeSpan.FromMinutes(5)))
+            .MetricsPollingInterval(TimeSpan.Zero)
+            .RunMaintenanceTasks(runQueueMaintenance)
+            .Serializer(serializer)
+            .LoggerFactory(Log)
+        );
 
         _logger.LogDebug("Queue Id: {QueueId}", queue.QueueId);
         return queue;
@@ -212,7 +207,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
     [RetryFact]
     public override async Task CanDequeueWithLockingAsync()
     {
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
         using var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer, LoggerFactory = Log });
         using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
         var distributedLock = new CacheLockProvider(cache, messageBus, null, Log);
@@ -222,7 +217,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
     [Fact]
     public override async Task CanHaveMultipleQueueInstancesWithLockingAsync()
     {
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
         using var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer, LoggerFactory = Log });
         using var messageBus = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
         var distributedLock = new CacheLockProvider(cache, messageBus, null, Log);
@@ -262,7 +257,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
 
         using (queue)
         {
-            var muxer = SharedConnection.GetMuxer(Log, Protocol);
+            var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
             var db = muxer.GetDatabase();
             string listPrefix = muxer.IsCluster() ? "{q:SimpleWorkItem}" : "q:SimpleWorkItem";
 
@@ -318,7 +313,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
             return;
 
         using RedisQueue<SimpleWorkItem> redisQueue = queue;
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
         var db = muxer.GetDatabase();
         string listPrefix = muxer.IsCluster() ? "{q:SimpleWorkItem}" : "q:SimpleWorkItem";
 
@@ -390,7 +385,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
             return;
 
         using RedisQueue<SimpleWorkItem> redisQueue = queue;
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
         var db = muxer.GetDatabase();
         string listPrefix = muxer.IsCluster() ? "{q:SimpleWorkItem}" : "q:SimpleWorkItem";
 
@@ -455,7 +450,7 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
             return;
 
         using RedisQueue<SimpleWorkItem> redisQueue = queue;
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
         var db = muxer.GetDatabase();
         string listPrefix = muxer.IsCluster() ? "{q:SimpleWorkItem}" : "q:SimpleWorkItem";
 
@@ -664,7 +659,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         Assert.Equal(workItemCount, stats.Completed + stats.Deadletter);
         Assert.Equal(0, stats.Queued);
 
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
         _logger.LogTrace("# Keys: {KeyCount}", await muxer.CountAllKeysAsync());
     }
 
@@ -708,7 +703,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         Assert.Equal(workItemCount, stats.Completed);
         Assert.Equal(0, stats.Queued);
 
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
         _logger.LogTrace("# Keys: {KeyCount}", await muxer.CountAllKeysAsync());
     }
 
@@ -754,7 +749,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
         Assert.Equal(workItemCount, stats.Completed);
         Assert.Equal(0, stats.Queued);
 
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
         _logger.LogTrace("# Keys: {KeyCount}", await muxer.CountAllKeysAsync());
     }
 
@@ -809,13 +804,13 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
 
     private IQueue<T> CreateQueue<T>(bool allQueuesTheSameName = true) where T : class
     {
-        string name = (typeof(T).FullName ?? typeof(T).Name).Trim().Replace(".", String.Empty).ToLower();
+        string name = typeof(T).Name.Trim().ToLower();
 
         if (allQueuesTheSameName)
             name = "cmd";
 
         var queue = new RedisQueue<T>(o => o
-            .ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol))
+            .ConnectionMultiplexer(SharedConnection.GetRequiredMuxer(Log, Protocol))
             .Name(name)
             .LoggerFactory(Log)
         );
@@ -836,7 +831,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
     public ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
         return new ValueTask(muxer.FlushAllAsync());
     }
 

@@ -14,13 +14,13 @@ public static class SharedConnection
     /// <summary>
     /// Returns a shared ConnectionMultiplexer for the given protocol. Two instances are cached (RESP2 and RESP3)
     /// so the test suite can run the same tests under both protocols without reconnecting.
+    /// Returns <c>null</c> when RedisConnectionString is not configured.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when RedisConnectionString is not configured.</exception>
-    public static ConnectionMultiplexer GetMuxer(ILoggerFactory loggerFactory, RedisProtocol? protocol = null)
+    public static ConnectionMultiplexer? GetMuxer(ILoggerFactory loggerFactory, RedisProtocol? protocol = null)
     {
         string? connectionString = Configuration.GetConnectionString("RedisConnectionString");
         if (String.IsNullOrEmpty(connectionString))
-            throw new InvalidOperationException("RedisConnectionString is not configured. Set it in the test configuration to run Redis integration tests.");
+            return null;
 
         bool useResp3 = protocol >= RedisProtocol.Resp3;
         ref ConnectionMultiplexer? muxer = ref useResp3 ? ref _muxerResp3 : ref _muxerResp2;
@@ -41,5 +41,15 @@ public static class SharedConnection
             });
             return muxer;
         }
+    }
+
+    /// <summary>
+    /// Returns a shared ConnectionMultiplexer or throws if RedisConnectionString is not configured.
+    /// Use this in test setup and test methods that require a live Redis connection.
+    /// </summary>
+    public static ConnectionMultiplexer GetRequiredMuxer(ILoggerFactory loggerFactory, RedisProtocol? protocol = null)
+    {
+        return GetMuxer(loggerFactory, protocol)
+            ?? throw new InvalidOperationException("RedisConnectionString is not configured. Set it in appsettings.json to run Redis integration tests.");
     }
 }

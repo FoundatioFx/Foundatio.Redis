@@ -40,10 +40,7 @@ public class PingQueueJob : QueueJobBase<PingRequest>
         _logger.LogInformation("Got {RunCount} ping. Sending pong!", RunCount.ToOrdinal());
         await Task.Delay(TimeSpan.FromMilliseconds(1)).AnyContext();
 
-        if (context.QueueEntry.Value is null)
-            return JobResult.FailedWithMessage("Queue entry value is null");
-
-        if (RandomData.GetBool(context.QueueEntry.Value.PercentChanceOfException))
+        if (RandomData.GetBool(context.QueueEntry.Value!.PercentChanceOfException))
             throw new ApplicationException("Boom!");
 
         return JobResult.Success;

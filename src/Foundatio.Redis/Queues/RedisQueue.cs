@@ -374,7 +374,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error deserializing queue entry payload: {WorkId}, abandoning for retry", value);
-            var poisonEntry = new QueueEntry<T>(value.ToString(), null, default!, this, _timeProvider.GetUtcNow().UtcDateTime, 0);
+            var poisonEntry = new QueueEntry<T>(value!, null, default!, this, _timeProvider.GetUtcNow().UtcDateTime, 0);
             await AbandonAsync(poisonEntry).AnyContext();
             return null;
         }
@@ -423,8 +423,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                 long now = _timeProvider.GetUtcNow().Ticks;
 
                 await LoadScriptsAsync().AnyContext();
-                var dequeueId = _dequeueId ?? throw new InvalidOperationException("Dequeue script not loaded.");
-                var result = await Database.ScriptEvaluateAsync(dequeueId, new
+                var result = await Database.ScriptEvaluateAsync(GetScript(_dequeueId), new
                 {
                     queueListName = (RedisKey)_queueListName,
                     workListName = (RedisKey)_workListName,
@@ -794,6 +793,11 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
 
             _scriptsLoaded = true;
         }
+    }
+
+    private LoadedLuaScript GetScript(LoadedLuaScript? script)
+    {
+        return script ?? throw new QueueException("Lua scripts not loaded. Call LoadScriptsAsync first.");
     }
 
     public override void Dispose()

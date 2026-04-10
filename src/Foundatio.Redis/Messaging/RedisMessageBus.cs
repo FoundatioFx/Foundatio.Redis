@@ -86,7 +86,7 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
             var envelope = _serializer.Deserialize<RedisMessageEnvelope>(messageBytes);
             if (envelope is null)
             {
-                _logger.LogWarning("OnMessage({Channel}) Deserialized envelope was null", channelMessage.Channel);
+                _logger.LogError("OnMessage({Channel}) Deserialized envelope was null", channelMessage.Channel);
                 return;
             }
 
@@ -96,7 +96,7 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
             message = new Message(envelope.Data ?? [], DeserializeMessageBody)
             {
                 Type = envelope.Type,
-                ClrType = envelope.Type is not null ? GetMappedMessageType(envelope.Type) : null,
+                ClrType = GetMappedMessageType(envelope.Type),
                 CorrelationId = envelope.CorrelationId,
                 UniqueId = envelope.UniqueId
             };
@@ -133,8 +133,8 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
     {
         if (options.DeliveryDelay.HasValue && options.DeliveryDelay.Value > TimeSpan.Zero)
         {
-            var mappedType = GetMappedMessageType(messageType);
             _logger.LogTrace("Schedule delayed message: {MessageType} ({Delay}ms)", messageType, options.DeliveryDelay.Value.TotalMilliseconds);
+            var mappedType = GetMappedMessageType(messageType);
             if (mappedType is null)
                 throw new MessageBusException($"Unable to resolve CLR type for delayed message: {messageType}");
 

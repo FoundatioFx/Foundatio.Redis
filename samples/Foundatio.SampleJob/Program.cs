@@ -27,7 +27,7 @@ public class Program
     }
 }
 
-public class EchoMessage
+public record EchoMessage
 {
-    public string Message { get; set; } = null!;
+    public required string Message { get; set; }
 }
