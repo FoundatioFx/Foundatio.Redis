@@ -986,12 +986,12 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 _setAllExpiration = await setAllExpiration.LoadAsync(server).AnyContext();
             }
 
+            if (_incrementWithExpire is null || _removeIfEqual is null || _replaceIfEqual is null ||
+                _setIfHigher is null || _setIfLower is null || _getAllExpiration is null || _setAllExpiration is null)
+                throw new CacheException("Lua scripts could not be loaded: no connected primary Redis server found.");
+
             _scriptsLoaded = true;
         }
-
-        if (_incrementWithExpire is null || _removeIfEqual is null || _replaceIfEqual is null ||
-            _setIfHigher is null || _setIfLower is null || _getAllExpiration is null || _setAllExpiration is null)
-            throw new CacheException("Lua scripts could not be loaded: no connected primary Redis server found.");
     }
 
     private LoadedLuaScript GetScript(LoadedLuaScript? script)

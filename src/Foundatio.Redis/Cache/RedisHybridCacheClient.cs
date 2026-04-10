@@ -11,9 +11,9 @@ public class RedisHybridCacheClient : HybridCacheClient
 
     private static RedisCacheClient CreateCacheClient(RedisHybridCacheClientOptions options)
     {
-        var connectionMultiplexer = options.ConnectionMultiplexer ?? throw new ArgumentNullException(nameof(options), "ConnectionMultiplexer is required.");
+        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer, nameof(options.ConnectionMultiplexer));
         return new RedisCacheClient(o => o
-            .ConnectionMultiplexer(connectionMultiplexer)
+            .ConnectionMultiplexer(options.ConnectionMultiplexer)
             .Serializer(options.Serializer)
             .LoggerFactory(options.LoggerFactory)
             .ShouldThrowOnSerializationError(options.ShouldThrowOnSerializationError)
@@ -23,9 +23,9 @@ public class RedisHybridCacheClient : HybridCacheClient
 
     private static RedisMessageBus CreateMessageBus(RedisHybridCacheClientOptions options)
     {
-        var connectionMultiplexer = options.ConnectionMultiplexer ?? throw new ArgumentNullException(nameof(options), "ConnectionMultiplexer is required.");
+        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer, nameof(options.ConnectionMultiplexer));
         return new RedisMessageBus(o => o
-            .Subscriber(connectionMultiplexer.GetSubscriber())
+            .Subscriber(options.ConnectionMultiplexer.GetSubscriber())
             .Topic(options.RedisChannelName)
             .Serializer(options.Serializer)
             .LoggerFactory(options.LoggerFactory));

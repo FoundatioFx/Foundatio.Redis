@@ -787,11 +787,11 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                 _dequeueId = await dequeueId.LoadAsync(server).AnyContext();
             }
 
+            if (_dequeueId is null)
+                throw new InvalidOperationException("Lua scripts could not be loaded: no connected primary Redis server found.");
+
             _scriptsLoaded = true;
         }
-
-        if (_dequeueId is null)
-            throw new InvalidOperationException("Lua scripts could not be loaded: no connected primary Redis server found.");
     }
 
     public override void Dispose()
