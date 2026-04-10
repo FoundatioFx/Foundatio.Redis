@@ -17,7 +17,7 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     protected override ICacheClient GetCacheClient(bool shouldThrowOnSerializationError = true)
     {
         return new ScopedCacheClient(new RedisHybridCacheClient(o => o
-                .ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol))
+                .ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol)!)
                 .LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError),
             localConfig => localConfig
                 .CloneValues(true)
@@ -27,7 +27,7 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     protected override HybridCacheClient GetDistributedHybridCacheClient(bool shouldThrowOnSerializationError = true)
     {
         return new RedisHybridCacheClient(o => o
-                .ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol))
+                .ConnectionMultiplexer(SharedConnection.GetMuxer(Log, Protocol)!)
                 .LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError),
             localConfig => localConfig
                 .CloneValues(true)
@@ -700,7 +700,7 @@ public class ScopedRedisHybridCacheClientTests : HybridCacheClientTestBase, IAsy
     public ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
         return new ValueTask(muxer.FlushAllAsync());
     }
 

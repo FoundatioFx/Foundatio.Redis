@@ -246,7 +246,8 @@ public class RedisFileStorage : IFileStorage
         if (limit is <= 0)
             return Task.FromResult(new List<FileSpec>());
 
-        searchPattern = searchPattern?.Replace('\\', '/');
+        if (searchPattern is not null)
+            searchPattern = NormalizePath(searchPattern);
         string? prefix = searchPattern;
         Regex? patternRegex = null;
         int wildcardPos = searchPattern?.IndexOf('*') ?? -1;
@@ -261,8 +262,8 @@ public class RedisFileStorage : IFileStorage
         int pageSize = limit ?? Int32.MaxValue;
 
         _logger.LogTrace(
-            s => s.Property("SearchPattern", searchPattern ?? string.Empty).Property("Limit", limit ?? -1).Property("Skip", skip ?? 0),
-            "Getting file list matching {Prefix} and {Pattern}...", prefix, patternRegex as object ?? "(none)"
+            s => s.Property("SearchPattern", searchPattern).Property("Limit", limit).Property("Skip", skip),
+            "Getting file list matching {Prefix} and {Pattern}...", prefix, patternRegex!
         );
 
         return Task.FromResult(Database.HashScan(_fileSpecContainer, $"{prefix}*", flags: _options.ReadMode)
@@ -294,7 +295,7 @@ public class RedisFileStorage : IFileStorage
 
         _logger.LogTrace(
             s => s.Property("Limit", pagingLimit).Property("Skip", skip),
-            "Getting files matching {Prefix} and {Pattern}...", criteria.Prefix, criteria.Pattern as object ?? "(none)"
+            "Getting files matching {Prefix} and {Pattern}...", criteria.Prefix, criteria.Pattern!
         );
 
         var list = Database.HashScan(_fileSpecContainer, $"{criteria.Prefix}*", flags: _options.ReadMode)
@@ -328,7 +329,7 @@ public class RedisFileStorage : IFileStorage
 
     private class SearchCriteria
     {
-        public string Prefix { get; set; } = string.Empty;
+        public string Prefix { get; set; } = String.Empty;
         public Regex? Pattern { get; set; }
     }
 
