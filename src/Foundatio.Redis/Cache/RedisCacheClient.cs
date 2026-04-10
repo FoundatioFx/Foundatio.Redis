@@ -29,13 +29,13 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     private bool _scriptsLoaded;
     private bool? _supportsMsetEx;
 
-    private LoadedLuaScript _incrementWithExpire = null!;
-    private LoadedLuaScript _removeIfEqual = null!;
-    private LoadedLuaScript _replaceIfEqual = null!;
-    private LoadedLuaScript _setIfHigher = null!;
-    private LoadedLuaScript _setIfLower = null!;
-    private LoadedLuaScript _getAllExpiration = null!;
-    private LoadedLuaScript _setAllExpiration = null!;
+    private LoadedLuaScript? _incrementWithExpire;
+    private LoadedLuaScript? _removeIfEqual;
+    private LoadedLuaScript? _replaceIfEqual;
+    private LoadedLuaScript? _setIfHigher;
+    private LoadedLuaScript? _setIfLower;
+    private LoadedLuaScript? _getAllExpiration;
+    private LoadedLuaScript? _setAllExpiration;
 
     public RedisCacheClient(RedisCacheClientOptions options)
     {
@@ -73,7 +73,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         await LoadScriptsAsync().AnyContext();
 
         var expectedValue = expected.ToRedisValue(_options.Serializer);
-        var redisResult = await Database.ScriptEvaluateAsync(_removeIfEqual, new { key = (RedisKey)key, expected = expectedValue }).AnyContext();
+        var redisResult = await Database.ScriptEvaluateAsync(GetScript(_removeIfEqual), new { key = (RedisKey)key, expected = expectedValue }).AnyContext();
         int result = (int)redisResult;
 
         return result > 0;
@@ -318,7 +318,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 // Non-existent keys return nil/empty values in their respective positions.
                 // https://redis.io/commands/mget
                 for (int i = 0; i < hashSlotKeys.Length; i++)
-                    result[((string?)hashSlotKeys[i])!] = RedisValueToCacheValue<T>(values[i]);
+                    result[hashSlotKeys[i].ToString()] = RedisValueToCacheValue<T>(values[i]);
             }
 
             return result.AsReadOnly();
@@ -330,7 +330,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
             // Redis MGET guarantees that values are returned in the same order as keys
             for (int i = 0; i < redisKeys.Count; i++)
-                result[((string?)redisKeys[i])!] = RedisValueToCacheValue<T>(values[i]);
+                result[redisKeys[i].ToString()] = RedisValueToCacheValue<T>(values[i]);
 
             return result.AsReadOnly();
         }
@@ -516,7 +516,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         var expiresMs = GetExpirationMilliseconds(expiresIn);
         var expiresArg = expiresMs.HasValue ? (RedisValue)expiresMs.Value : RedisValue.EmptyString;
-        var result = await Database.ScriptEvaluateAsync(_setIfHigher, new { key = (RedisKey)key, value, expires = expiresArg }).AnyContext();
+        var result = await Database.ScriptEvaluateAsync(GetScript(_setIfHigher), new { key = (RedisKey)key, value, expires = expiresArg }).AnyContext();
         return (double)result;
     }
 
@@ -534,7 +534,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         var expiresMs = GetExpirationMilliseconds(expiresIn);
         var expiresArg = expiresMs.HasValue ? (RedisValue)expiresMs.Value : RedisValue.EmptyString;
-        var result = await Database.ScriptEvaluateAsync(_setIfHigher, new { key = (RedisKey)key, value, expires = expiresArg }).AnyContext();
+        var result = await Database.ScriptEvaluateAsync(GetScript(_setIfHigher), new { key = (RedisKey)key, value, expires = expiresArg }).AnyContext();
         return (long)result;
     }
 
@@ -552,7 +552,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         var expiresMs = GetExpirationMilliseconds(expiresIn);
         var expiresArg = expiresMs.HasValue ? (RedisValue)expiresMs.Value : RedisValue.EmptyString;
-        var result = await Database.ScriptEvaluateAsync(_setIfLower, new { key = (RedisKey)key, value, expires = expiresArg }).AnyContext();
+        var result = await Database.ScriptEvaluateAsync(GetScript(_setIfLower), new { key = (RedisKey)key, value, expires = expiresArg }).AnyContext();
         return (double)result;
     }
 
@@ -570,7 +570,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         var expiresMs = GetExpirationMilliseconds(expiresIn);
         var expiresArg = expiresMs.HasValue ? (RedisValue)expiresMs.Value : RedisValue.EmptyString;
-        var result = await Database.ScriptEvaluateAsync(_setIfLower, new { key = (RedisKey)key, value, expires = expiresArg }).AnyContext();
+        var result = await Database.ScriptEvaluateAsync(GetScript(_setIfLower), new { key = (RedisKey)key, value, expires = expiresArg }).AnyContext();
         return (long)result;
     }
 
@@ -754,7 +754,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         var expiresMs = GetExpirationMilliseconds(expiresIn);
         var expiresArg = expiresMs.HasValue ? (RedisValue)expiresMs.Value : RedisValue.EmptyString;
-        var redisResult = await Database.ScriptEvaluateAsync(_replaceIfEqual, new { key = (RedisKey)key, value = redisValue, expected = expectedValue, expires = expiresArg }).AnyContext();
+        var redisResult = await Database.ScriptEvaluateAsync(GetScript(_replaceIfEqual), new { key = (RedisKey)key, value = redisValue, expected = expectedValue, expires = expiresArg }).AnyContext();
 
         var result = (int)redisResult;
 
@@ -777,7 +777,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         // Always use Lua script - handles both expiration and TTL removal (null expiration removes TTL)
         await LoadScriptsAsync().AnyContext();
-        var result = await Database.ScriptEvaluateAsync(_incrementWithExpire, new { key = (RedisKey)key, value = amount, expires = expiresArg }).AnyContext();
+        var result = await Database.ScriptEvaluateAsync(GetScript(_incrementWithExpire), new { key = (RedisKey)key, value = amount, expires = expiresArg }).AnyContext();
         return (double)result;
     }
 
@@ -797,7 +797,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         // Always use Lua script - handles both expiration and TTL removal (null expiration removes TTL)
         await LoadScriptsAsync().AnyContext();
-        var result = await Database.ScriptEvaluateAsync(_incrementWithExpire, new { key = (RedisKey)key, value = amount, expires = expiresArg }).AnyContext();
+        var result = await Database.ScriptEvaluateAsync(GetScript(_incrementWithExpire), new { key = (RedisKey)key, value = amount, expires = expiresArg }).AnyContext();
         return (long)result;
     }
 
@@ -852,7 +852,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             foreach (var hashSlotGroup in keyList.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
             {
                 var hashSlotKeys = hashSlotGroup.ToArray();
-                var redisResult = await Database.ScriptEvaluateAsync(_getAllExpiration.Hash, hashSlotKeys).AnyContext();
+                var redisResult = await Database.ScriptEvaluateAsync(GetScript(_getAllExpiration).Hash, hashSlotKeys).AnyContext();
                 if (redisResult.IsNull)
                     continue;
 
@@ -867,7 +867,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
                 for (int hashSlotIndex = 0; hashSlotIndex < hashSlotKeys.Length; hashSlotIndex++)
                 {
-                    string key = ((string?)hashSlotKeys[hashSlotIndex])!;
+                    string key = hashSlotKeys[hashSlotIndex].ToString();
                     long ttl = ttls[hashSlotIndex];
                     if (ttl == -2) // Key doesn't exist - omit from result
                         continue;
@@ -883,7 +883,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         else
         {
             var redisKeys = keyList.ToArray();
-            var redisResult = await Database.ScriptEvaluateAsync(_getAllExpiration.Hash, redisKeys).AnyContext();
+            var redisResult = await Database.ScriptEvaluateAsync(GetScript(_getAllExpiration).Hash, redisKeys).AnyContext();
 
             if (redisResult.IsNull)
                 return ReadOnlyDictionary<string, TimeSpan?>.Empty;
@@ -900,7 +900,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             var result = new Dictionary<string, TimeSpan?>();
             for (int keyIndex = 0; keyIndex < redisKeys.Length; keyIndex++)
             {
-                string key = ((string?)redisKeys[keyIndex])!;
+                string key = redisKeys[keyIndex].ToString();
                 long ttl = ttls[keyIndex];
                 if (ttl == -2) // Key doesn't exist - omit from result
                     continue;
@@ -936,7 +936,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                     .Select(kvp => (RedisValue)(GetExpirationMilliseconds(kvp.Value) ?? -1))
                     .ToArray();
 
-                await Database.ScriptEvaluateAsync(_setAllExpiration.Hash, keys, values).AnyContext();
+                await Database.ScriptEvaluateAsync(GetScript(_setAllExpiration).Hash, keys, values).AnyContext();
             }
         }
         else
@@ -946,7 +946,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 .Select(kvp => (RedisValue)(GetExpirationMilliseconds(kvp.Value) ?? -1))
                 .ToArray();
 
-            await Database.ScriptEvaluateAsync(_setAllExpiration.Hash, keys, values).AnyContext();
+            await Database.ScriptEvaluateAsync(GetScript(_setAllExpiration).Hash, keys, values).AnyContext();
         }
     }
 
@@ -985,6 +985,15 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
             _scriptsLoaded = true;
         }
+
+        if (_incrementWithExpire is null || _removeIfEqual is null || _replaceIfEqual is null ||
+            _setIfHigher is null || _setIfLower is null || _getAllExpiration is null || _setAllExpiration is null)
+            throw new InvalidOperationException("Lua scripts could not be loaded: no connected primary Redis server found.");
+    }
+
+    private LoadedLuaScript GetScript(LoadedLuaScript? script)
+    {
+        return script ?? throw new InvalidOperationException("Lua scripts not loaded. Call LoadScriptsAsync first.");
     }
 
     private void ConnectionMultiplexerOnConnectionRestored(object? sender, ConnectionFailedEventArgs connectionFailedEventArgs)

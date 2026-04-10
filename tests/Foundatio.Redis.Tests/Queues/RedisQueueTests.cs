@@ -809,7 +809,7 @@ while ((((tonumber(redis.call(""time"")[1]) - now))) < {DELAY_TIME_SEC}) do end"
 
     private IQueue<T> CreateQueue<T>(bool allQueuesTheSameName = true) where T : class
     {
-        string name = typeof(T).FullName!.Trim().Replace(".", String.Empty).ToLower();
+        string name = (typeof(T).FullName ?? typeof(T).Name).Trim().Replace(".", String.Empty).ToLower();
 
         if (allQueuesTheSameName)
             name = "cmd";

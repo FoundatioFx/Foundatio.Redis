@@ -353,7 +353,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
 
         try
         {
-            var entry = await GetQueueEntryAsync(((string?)value)!).AnyContext();
+            var entry = await GetQueueEntryAsync(value.ToString()).AnyContext();
             if (entry is null)
                 return null;
 

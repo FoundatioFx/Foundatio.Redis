@@ -28,11 +28,7 @@ public class PingQueueJob : QueueJobBase<PingRequest>
 
     protected override Task<ILock?> GetQueueEntryLockAsync(IQueueEntry<PingRequest> queueEntry, CancellationToken cancellationToken = new CancellationToken())
     {
-        if (queueEntry.Value is null)
-        {
-            _logger.LogWarning("Queue entry value is null, skipping lock acquisition");
-            return Task.FromResult<ILock?>(null);
-        }
+        ArgumentNullException.ThrowIfNull(queueEntry.Value);
 
         return _locker.AcquireAsync(String.Concat("pull:", queueEntry.Value.Id),
             TimeSpan.FromMinutes(30),
@@ -41,11 +37,7 @@ public class PingQueueJob : QueueJobBase<PingRequest>
 
     protected override async Task<JobResult> ProcessQueueEntryAsync(QueueEntryContext<PingRequest> context)
     {
-        if (context.QueueEntry.Value is null)
-        {
-            _logger.LogWarning("Queue entry value is null");
-            return JobResult.Success;
-        }
+        ArgumentNullException.ThrowIfNull(context.QueueEntry.Value);
 
         Interlocked.Increment(ref _runCount);
 
@@ -59,9 +51,9 @@ public class PingQueueJob : QueueJobBase<PingRequest>
     }
 }
 
-public class PingRequest
+public record PingRequest
 {
-    public string Data { get; set; } = null!;
-    public string Id { get; set; } = null!;
-    public int PercentChanceOfException { get; set; } = 0;
+    public required string Data { get; set; }
+    public required string Id { get; set; }
+    public int PercentChanceOfException { get; set; }
 }
