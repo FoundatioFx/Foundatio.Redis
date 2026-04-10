@@ -210,14 +210,14 @@ public class Program
     }
 }
 
-public class EchoMessage
+public record EchoMessage
 {
-    public string Message { get; set; } = null!;
+    public required string Message { get; set; }
 }
 
-public class PingRequest
+public record PingRequest
 {
-    public string Data { get; set; } = null!;
+    public required string Data { get; set; }
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
-    public int PercentChanceOfException { get; set; } = 0;
+    public int PercentChanceOfException { get; set; }
 }

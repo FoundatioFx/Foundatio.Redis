@@ -95,7 +95,7 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
 
             message = new Message(envelope.Data ?? [], DeserializeMessageBody)
             {
-                Type = envelope.Type ?? String.Empty,
+                Type = envelope.Type,
                 ClrType = envelope.Type is not null ? GetMappedMessageType(envelope.Type) : null,
                 CorrelationId = envelope.CorrelationId,
                 UniqueId = envelope.UniqueId

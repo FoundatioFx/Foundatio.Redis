@@ -28,7 +28,7 @@ public class PingQueueJob : QueueJobBase<PingRequest>
 
     protected override Task<ILock?> GetQueueEntryLockAsync(IQueueEntry<PingRequest> queueEntry, CancellationToken cancellationToken = new CancellationToken())
     {
-        return _locker.AcquireAsync(String.Concat("pull:", queueEntry.Value!.Id),
+        return _locker.AcquireAsync(String.Concat("pull:", queueEntry.Value?.Id),
             TimeSpan.FromMinutes(30),
             TimeSpan.FromSeconds(1));
     }
@@ -40,7 +40,10 @@ public class PingQueueJob : QueueJobBase<PingRequest>
         _logger.LogInformation("Got {RunCount} ping. Sending pong!", RunCount.ToOrdinal());
         await Task.Delay(TimeSpan.FromMilliseconds(1)).AnyContext();
 
-        if (RandomData.GetBool(context.QueueEntry.Value!.PercentChanceOfException))
+        if (context.QueueEntry.Value is null)
+            return JobResult.FailedWithMessage("Queue entry value is null");
+
+        if (RandomData.GetBool(context.QueueEntry.Value.PercentChanceOfException))
             throw new ApplicationException("Boom!");
 
         return JobResult.Success;

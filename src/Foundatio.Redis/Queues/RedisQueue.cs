@@ -790,7 +790,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
             }
 
             if (_dequeueId is null)
-                throw new InvalidOperationException("Lua scripts could not be loaded: no connected primary Redis server found.");
+                throw new QueueException("Lua scripts could not be loaded: no connected primary Redis server found.");
 
             _scriptsLoaded = true;
         }
