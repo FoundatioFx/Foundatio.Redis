@@ -4,7 +4,7 @@ namespace Foundatio.Messaging;
 
 public class RedisMessageBusOptions : SharedMessageBusOptions
 {
-    public ISubscriber Subscriber { get; set; } = null!;
+    public ISubscriber? Subscriber { get; set; }
 }
 
 public class RedisMessageBusOptionsBuilder : SharedMessageBusOptionsBuilder<RedisMessageBusOptions, RedisMessageBusOptionsBuilder>
