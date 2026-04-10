@@ -265,7 +265,7 @@ public class RedisFileStorage : IFileStorage
 
         _logger.LogTrace(
             s => s.Property("SearchPattern", searchPattern).Property("Limit", limit).Property("Skip", skip),
-            "Getting file list matching {Prefix} and {Pattern}...", prefix, patternRegex!
+            "Getting file list matching {Prefix} and {Pattern}...", prefix, patternRegex
         );
 
         return Task.FromResult(Database.HashScan(_fileSpecContainer, $"{prefix}*", flags: _options.ReadMode)
@@ -298,7 +298,7 @@ public class RedisFileStorage : IFileStorage
 
         _logger.LogTrace(
             s => s.Property("Limit", pagingLimit).Property("Skip", skip),
-            "Getting files matching {Prefix} and {Pattern}...", criteria.Prefix, criteria.Pattern!
+            "Getting files matching {Prefix} and {Pattern}...", criteria.Prefix, criteria.Pattern
         );
 
         var list = Database.HashScan(_fileSpecContainer, $"{criteria.Prefix}*", flags: _options.ReadMode)

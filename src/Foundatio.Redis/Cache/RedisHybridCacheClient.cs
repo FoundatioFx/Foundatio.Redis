@@ -11,7 +11,8 @@ public class RedisHybridCacheClient : HybridCacheClient
 
     private static RedisCacheClient CreateCacheClient(RedisHybridCacheClientOptions options)
     {
-        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer, nameof(options.ConnectionMultiplexer));
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer);
         return new RedisCacheClient(o => o
             .ConnectionMultiplexer(options.ConnectionMultiplexer)
             .Serializer(options.Serializer)
@@ -23,7 +24,8 @@ public class RedisHybridCacheClient : HybridCacheClient
 
     private static RedisMessageBus CreateMessageBus(RedisHybridCacheClientOptions options)
     {
-        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer, nameof(options.ConnectionMultiplexer));
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer);
         return new RedisMessageBus(o => o
             .Subscriber(options.ConnectionMultiplexer.GetSubscriber())
             .Topic(options.RedisChannelName)
