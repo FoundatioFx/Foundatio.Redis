@@ -19,6 +19,7 @@ namespace Foundatio.Caching;
 public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 {
     private readonly RedisCacheClientOptions _options;
+    private readonly IConnectionMultiplexer _connectionMultiplexer;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
     private readonly bool _isCluster;
@@ -39,16 +40,18 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
     public RedisCacheClient(RedisCacheClientOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer);
 
         _options = options;
+        _connectionMultiplexer = options.ConnectionMultiplexer;
         _timeProvider = options.TimeProvider ?? TimeProvider.System;
         options.Serializer ??= DefaultSerializer.Instance;
         _logger = options.LoggerFactory?.CreateLogger(typeof(RedisCacheClient)) ?? NullLogger.Instance;
 
-        options.ConnectionMultiplexer.ConnectionRestored += ConnectionMultiplexerOnConnectionRestored;
-        options.ConnectionMultiplexer.ConnectionFailed += ConnectionMultiplexerOnConnectionFailed;
-        _isCluster = options.ConnectionMultiplexer.IsCluster();
+        _connectionMultiplexer.ConnectionRestored += ConnectionMultiplexerOnConnectionRestored;
+        _connectionMultiplexer.ConnectionFailed += ConnectionMultiplexerOnConnectionFailed;
+        _isCluster = _connectionMultiplexer.IsCluster();
     }
 
     public RedisCacheClient(Builder<RedisCacheClientOptionsBuilder, RedisCacheClientOptions> config)
@@ -56,7 +59,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     {
     }
 
-    public IDatabase Database => _options.ConnectionMultiplexer.GetDatabase(_options.Database);
+    public IDatabase Database => _connectionMultiplexer.GetDatabase(_options.Database);
 
     public Task<bool> RemoveAsync(string key)
     {
@@ -87,13 +90,13 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         long deleted = 0;
         if (keys is null)
         {
-            var endpoints = _options.ConnectionMultiplexer.GetEndPoints();
+            var endpoints = _connectionMultiplexer.GetEndPoints();
             if (endpoints.Length is 0)
                 return 0;
 
             foreach (var endpoint in endpoints)
             {
-                var server = _options.ConnectionMultiplexer.GetServer(endpoint);
+                var server = _connectionMultiplexer.GetServer(endpoint);
                 if (server.IsReplica)
                     continue;
 
@@ -192,7 +195,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         if (String.IsNullOrEmpty(prefix))
             return await RemoveAllAsync().AnyContext();
 
-        var endpoints = _options.ConnectionMultiplexer.GetEndPoints();
+        var endpoints = _connectionMultiplexer.GetEndPoints();
         if (endpoints.Length == 0)
             return 0;
 
@@ -202,7 +205,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         long deleted = 0;
         foreach (var endpoint in endpoints)
         {
-            var server = _options.ConnectionMultiplexer.GetServer(endpoint);
+            var server = _connectionMultiplexer.GetServer(endpoint);
             if (server.IsReplica)
                 continue;
 
@@ -215,7 +218,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 if (isCluster)
                 {
                     // NOTE: Consider parallel processing per hash slot for performance optimization
-                    foreach (var slotGroup in keys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
+                    foreach (var slotGroup in keys.GroupBy(k => _connectionMultiplexer.HashSlot(k)))
                     {
                         long count = await Database.KeyDeleteAsync(slotGroup.ToArray()).AnyContext();
                         Interlocked.Add(ref deleted, count);
@@ -309,7 +312,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         {
             var result = new Dictionary<string, CacheValue<T>>(redisKeys.Count);
             // NOTE: Consider parallel processing per hash slot for performance optimization
-            foreach (var hashSlotGroup in redisKeys.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
+            foreach (var hashSlotGroup in redisKeys.GroupBy(k => _connectionMultiplexer.HashSlot(k)))
             {
                 var hashSlotKeys = hashSlotGroup.ToArray();
                 var values = await Database.StringGetAsync(hashSlotKeys, _options.ReadMode).AnyContext();
@@ -620,7 +623,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             // require all keys to be in the same slot
             // NOTE: Consider parallel processing per hash slot for performance optimization
             int successCount = 0;
-            foreach (var slotGroup in pairs.GroupBy(p => _options.ConnectionMultiplexer.HashSlot(p.Key)))
+            foreach (var slotGroup in pairs.GroupBy(p => _connectionMultiplexer.HashSlot(p.Key)))
             {
                 int count = await SetAllInternalAsync(slotGroup.ToArray(), expiresIn).AnyContext();
                 Interlocked.Add(ref successCount, count);
@@ -694,7 +697,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         // Redis 8.4 RC1 is internally versioned as 8.3.224
         var minVersion = new Version(8, 3, 224);
 
-        var endpoints = _options.ConnectionMultiplexer.GetEndPoints();
+        var endpoints = _connectionMultiplexer.GetEndPoints();
         if (endpoints.Length == 0)
         {
             _logger.LogDebug("SupportsMsetexCommand: No endpoints configured, MSETEX not available");
@@ -704,7 +707,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         bool foundConnectedPrimary = false;
         foreach (var endpoint in endpoints)
         {
-            var server = _options.ConnectionMultiplexer.GetServer(endpoint);
+            var server = _connectionMultiplexer.GetServer(endpoint);
             if (server.IsConnected && !server.IsReplica)
             {
                 foundConnectedPrimary = true;
@@ -849,7 +852,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         {
             var result = new Dictionary<string, TimeSpan?>(keyList.Count);
             // NOTE: Consider parallel processing per hash slot for performance optimization
-            foreach (var hashSlotGroup in keyList.GroupBy(k => _options.ConnectionMultiplexer.HashSlot(k)))
+            foreach (var hashSlotGroup in keyList.GroupBy(k => _connectionMultiplexer.HashSlot(k)))
             {
                 var hashSlotKeys = hashSlotGroup.ToArray();
                 var redisResult = await Database.ScriptEvaluateAsync(GetScript(_getAllExpiration).Hash, hashSlotKeys).AnyContext();
@@ -928,7 +931,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         if (_isCluster)
         {
             // NOTE: Consider parallel processing per hash slot for performance optimization
-            foreach (var hashSlotGroup in expirations.GroupBy(kvp => _options.ConnectionMultiplexer.HashSlot(kvp.Key)))
+            foreach (var hashSlotGroup in expirations.GroupBy(kvp => _connectionMultiplexer.HashSlot(kvp.Key)))
             {
                 var hashSlotExpirations = hashSlotGroup.ToList();
                 var keys = hashSlotExpirations.Select(kvp => (RedisKey)kvp.Key).ToArray();
@@ -968,9 +971,9 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             var getAllExpiration = LuaScript.Prepare(GetAllExpirationScript);
             var setAllExpiration = LuaScript.Prepare(SetAllExpirationScript);
 
-            foreach (var endpoint in _options.ConnectionMultiplexer.GetEndPoints())
+            foreach (var endpoint in _connectionMultiplexer.GetEndPoints())
             {
-                var server = _options.ConnectionMultiplexer.GetServer(endpoint);
+                var server = _connectionMultiplexer.GetServer(endpoint);
                 if (server.IsReplica)
                     continue;
 
@@ -988,12 +991,12 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         if (_incrementWithExpire is null || _removeIfEqual is null || _replaceIfEqual is null ||
             _setIfHigher is null || _setIfLower is null || _getAllExpiration is null || _setAllExpiration is null)
-            throw new InvalidOperationException("Lua scripts could not be loaded: no connected primary Redis server found.");
+            throw new CacheException("Lua scripts could not be loaded: no connected primary Redis server found.");
     }
 
     private LoadedLuaScript GetScript(LoadedLuaScript? script)
     {
-        return script ?? throw new InvalidOperationException("Lua scripts not loaded. Call LoadScriptsAsync first.");
+        return script ?? throw new CacheException("Lua scripts not loaded. Call LoadScriptsAsync first.");
     }
 
     private void ConnectionMultiplexerOnConnectionRestored(object? sender, ConnectionFailedEventArgs connectionFailedEventArgs)
@@ -1016,8 +1019,8 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         _isDisposed = true;
         _disposedCancellationTokenSource.Cancel();
         _disposedCancellationTokenSource.Dispose();
-        _options.ConnectionMultiplexer.ConnectionRestored -= ConnectionMultiplexerOnConnectionRestored;
-        _options.ConnectionMultiplexer.ConnectionFailed -= ConnectionMultiplexerOnConnectionFailed;
+        _connectionMultiplexer.ConnectionRestored -= ConnectionMultiplexerOnConnectionRestored;
+        _connectionMultiplexer.ConnectionFailed -= ConnectionMultiplexerOnConnectionFailed;
     }
 
     /// <summary>

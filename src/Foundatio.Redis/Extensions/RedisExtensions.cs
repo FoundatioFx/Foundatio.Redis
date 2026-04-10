@@ -11,22 +11,30 @@ internal static class RedisValueExtensions
 {
     private static readonly RedisValue _nullValue = "@@NULL";
 
+    /// <summary>
+    /// Converts a <see cref="RedisValue"/> to the specified type <typeparamref name="T"/>.
+    /// Handles primitive types, nullable types, and complex types via serializer.
+    /// </summary>
+    /// <returns>The converted value, or <c>default</c> for null <see cref="RedisValue"/> with nullable target types.</returns>
     [return: MaybeNull]
     public static T ToValueOfType<T>(this RedisValue redisValue, ISerializer serializer)
     {
-        T value;
         var type = typeof(T);
 
         if (type == TypeHelper.BoolType || type == TypeHelper.StringType || type.IsNumeric())
-            value = (T)Convert.ChangeType(redisValue, type)!;
-        else if (type == TypeHelper.NullableBoolType || type.IsNullableNumeric())
-            value = redisValue.IsNull ? default! : (T)Convert.ChangeType(redisValue, Nullable.GetUnderlyingType(type)!)!;
-        else
-            return serializer.Deserialize<T>(((byte[]?)redisValue)!);
+            return (T)Convert.ChangeType(redisValue, type)!;
 
-        return value;
+        if (type == TypeHelper.NullableBoolType || type.IsNullableNumeric())
+            return redisValue.IsNull ? default! : (T)Convert.ChangeType(redisValue, Nullable.GetUnderlyingType(type)!)!;
+
+        return serializer.Deserialize<T>(((byte[]?)redisValue)!);
     }
 
+    /// <summary>
+    /// Converts a value of type <typeparamref name="T"/> to a <see cref="RedisValue"/>.
+    /// Null values are stored as a sentinel string ("@@NULL") to distinguish from missing keys.
+    /// Handles primitive types directly and falls back to the serializer for complex types.
+    /// </summary>
     public static RedisValue ToRedisValue<T>(this T value, ISerializer serializer)
     {
         var redisValue = _nullValue;

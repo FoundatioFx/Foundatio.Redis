@@ -36,7 +36,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
     private readonly string _listPrefix;
     private readonly RedisChannel _topicChannel;
 
-    private LoadedLuaScript _dequeueId = null!;
+    private LoadedLuaScript? _dequeueId;
 
     public RedisQueue(RedisQueueOptions<T> options) : base(options)
     {
@@ -372,7 +372,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error deserializing queue entry payload: {WorkId}, abandoning for retry", value);
-            var poisonEntry = new QueueEntry<T>((string?)value ?? String.Empty, null, default!, this, _timeProvider.GetUtcNow().UtcDateTime, 0);
+            var poisonEntry = new QueueEntry<T>(value.ToString(), null, default!, this, _timeProvider.GetUtcNow().UtcDateTime, 0);
             await AbandonAsync(poisonEntry).AnyContext();
             return null;
         }
@@ -421,7 +421,8 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                 long now = _timeProvider.GetUtcNow().Ticks;
 
                 await LoadScriptsAsync().AnyContext();
-                var result = await Database.ScriptEvaluateAsync(_dequeueId, new
+                var dequeueId = _dequeueId ?? throw new InvalidOperationException("Dequeue script not loaded.");
+                var result = await Database.ScriptEvaluateAsync(dequeueId, new
                 {
                     queueListName = (RedisKey)_queueListName,
                     workListName = (RedisKey)_workListName,
@@ -788,6 +789,9 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
 
             _scriptsLoaded = true;
         }
+
+        if (_dequeueId is null)
+            throw new InvalidOperationException("Lua scripts could not be loaded: no connected primary Redis server found.");
     }
 
     public override void Dispose()

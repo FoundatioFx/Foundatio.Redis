@@ -1,22 +1,34 @@
+using System;
 using Foundatio.Messaging;
 namespace Foundatio.Caching;
 
 public class RedisHybridCacheClient : HybridCacheClient
 {
     public RedisHybridCacheClient(RedisHybridCacheClientOptions options, InMemoryCacheClientOptions? localOptions = null)
-        : base(new RedisCacheClient(o => o
-                .ConnectionMultiplexer(options.ConnectionMultiplexer)
-                .Serializer(options.Serializer)
-                .LoggerFactory(options.LoggerFactory)
-                .ShouldThrowOnSerializationError(options.ShouldThrowOnSerializationError)
-                .ReadMode(options.ReadMode)
-                .UseDatabase(options.Database)),
-            new RedisMessageBus(o => o
-                .Subscriber(options.ConnectionMultiplexer.GetSubscriber())
-                .Topic(options.RedisChannelName)
-                .Serializer(options.Serializer)
-                .LoggerFactory(options.LoggerFactory)), localOptions, options.LoggerFactory)
+        : base(CreateCacheClient(options), CreateMessageBus(options), localOptions, options.LoggerFactory)
     {
+    }
+
+    private static RedisCacheClient CreateCacheClient(RedisHybridCacheClientOptions options)
+    {
+        var connectionMultiplexer = options.ConnectionMultiplexer ?? throw new ArgumentNullException(nameof(options), "ConnectionMultiplexer is required.");
+        return new RedisCacheClient(o => o
+            .ConnectionMultiplexer(connectionMultiplexer)
+            .Serializer(options.Serializer)
+            .LoggerFactory(options.LoggerFactory)
+            .ShouldThrowOnSerializationError(options.ShouldThrowOnSerializationError)
+            .ReadMode(options.ReadMode)
+            .UseDatabase(options.Database));
+    }
+
+    private static RedisMessageBus CreateMessageBus(RedisHybridCacheClientOptions options)
+    {
+        var connectionMultiplexer = options.ConnectionMultiplexer ?? throw new ArgumentNullException(nameof(options), "ConnectionMultiplexer is required.");
+        return new RedisMessageBus(o => o
+            .Subscriber(connectionMultiplexer.GetSubscriber())
+            .Topic(options.RedisChannelName)
+            .Serializer(options.Serializer)
+            .LoggerFactory(options.LoggerFactory));
     }
 
     public RedisHybridCacheClient(Builder<RedisHybridCacheClientOptionsBuilder, RedisHybridCacheClientOptions> config,

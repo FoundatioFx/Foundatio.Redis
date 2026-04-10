@@ -17,6 +17,7 @@ namespace Foundatio.Storage;
 public class RedisFileStorage : IFileStorage
 {
     private readonly RedisFileStorageOptions _options;
+    private readonly IConnectionMultiplexer _connectionMultiplexer;
     private readonly ISerializer _serializer;
     private readonly IResiliencePolicy _resiliencePolicy;
     private readonly ILogger _logger;
@@ -24,16 +25,18 @@ public class RedisFileStorage : IFileStorage
 
     public RedisFileStorage(RedisFileStorageOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer);
 
+        _options = options;
+        _connectionMultiplexer = options.ConnectionMultiplexer;
         _serializer = options.Serializer ?? DefaultSerializer.Instance;
         _logger = options.LoggerFactory?.CreateLogger(GetType()) ?? NullLogger.Instance;
 
         _resiliencePolicy = options.ResiliencePolicyProvider.GetPolicy<RedisFileStorage, IFileStorage>(_logger, options.TimeProvider);
 
-        options.ConnectionMultiplexer.ConnectionRestored += ConnectionMultiplexerOnConnectionRestored;
+        _connectionMultiplexer.ConnectionRestored += ConnectionMultiplexerOnConnectionRestored;
         _fileSpecContainer = $"{options.ContainerName}-filespecs";
-        _options = options;
     }
 
     public RedisFileStorage(Builder<RedisFileStorageOptionsBuilder, RedisFileStorageOptions> config)
@@ -42,11 +45,11 @@ public class RedisFileStorage : IFileStorage
     }
 
     ISerializer IHaveSerializer.Serializer => _serializer;
-    public IDatabase Database => _options.ConnectionMultiplexer.GetDatabase();
+    public IDatabase Database => _connectionMultiplexer.GetDatabase();
 
     public void Dispose()
     {
-        _options.ConnectionMultiplexer.ConnectionRestored -= ConnectionMultiplexerOnConnectionRestored;
+        _connectionMultiplexer.ConnectionRestored -= ConnectionMultiplexerOnConnectionRestored;
     }
 
     [Obsolete($"Use {nameof(GetFileStreamAsync)} with {nameof(FileAccess)} instead to define read or write behaviour of stream")]
@@ -266,7 +269,8 @@ public class RedisFileStorage : IFileStorage
         );
 
         return Task.FromResult(Database.HashScan(_fileSpecContainer, $"{prefix}*", flags: _options.ReadMode)
-            .Select(entry => _serializer.Deserialize<FileSpec>(((byte[]?)entry.Value)!))
+            .Where(entry => entry.Value.HasValue)
+            .Select(entry => _serializer.Deserialize<FileSpec>((byte[]?)entry.Value ?? []))
             .Where(fileSpec => fileSpec is not null && (patternRegex is null || patternRegex.IsMatch(fileSpec.Path)))
             .Cast<FileSpec>()
             .Take(pageSize)
@@ -298,7 +302,8 @@ public class RedisFileStorage : IFileStorage
         );
 
         var list = Database.HashScan(_fileSpecContainer, $"{criteria.Prefix}*", flags: _options.ReadMode)
-            .Select(entry => _serializer.Deserialize<FileSpec>(((byte[]?)entry.Value)!))
+            .Where(entry => entry.Value.HasValue)
+            .Select(entry => _serializer.Deserialize<FileSpec>((byte[]?)entry.Value ?? []))
             .Where(fileSpec => fileSpec is not null && (criteria.Pattern is null || criteria.Pattern.IsMatch(fileSpec.Path)))
             .Cast<FileSpec>()
             .Skip(skip)
@@ -321,8 +326,11 @@ public class RedisFileStorage : IFileStorage
         };
     }
 
-    private string NormalizePath(string path)
+    private string NormalizePath(string? path)
     {
+        if (String.IsNullOrEmpty(path))
+            return path ?? String.Empty;
+
         return path.Replace('\\', '/');
     }
 
