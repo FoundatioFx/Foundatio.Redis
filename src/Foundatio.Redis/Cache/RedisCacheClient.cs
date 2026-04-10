@@ -39,6 +39,8 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
     public RedisCacheClient(RedisCacheClientOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer);
+
         _options = options;
         _timeProvider = options.TimeProvider ?? TimeProvider.System;
         options.Serializer ??= DefaultSerializer.Instance;

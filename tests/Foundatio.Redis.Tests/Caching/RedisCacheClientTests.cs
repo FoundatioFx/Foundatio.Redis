@@ -636,7 +636,7 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     [Fact]
     public async Task GetListAsync_WithExistingFormat_UpgradeListType()
     {
-        var db = SharedConnection.GetMuxer(Log, Protocol)!.GetDatabase();
+        var db = SharedConnection.GetMuxer(Log, Protocol).GetDatabase();
         var cache = GetCacheClient();
         if (cache == null)
             return;

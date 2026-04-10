@@ -86,6 +86,9 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
                 return;
             }
 
+            if (envelope.Data is null || envelope.Type is null)
+                _logger.LogWarning("OnMessage({Channel}) Envelope has null {Field}, treating as empty", channelMessage.Channel, envelope.Data is null ? "Data" : "Type");
+
             message = new Message(envelope.Data ?? [], DeserializeMessageBody)
             {
                 Type = envelope.Type ?? string.Empty,
