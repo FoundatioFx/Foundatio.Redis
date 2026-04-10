@@ -86,7 +86,7 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
                 return;
             }
 
-            message = new Message(envelope.Data, DeserializeMessageBody)
+            message = new Message(envelope.Data ?? [], DeserializeMessageBody)
             {
                 Type = envelope.Type ?? string.Empty,
                 ClrType = envelope.Type is not null ? GetMappedMessageType(envelope.Type) : null,
@@ -94,8 +94,11 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
                 UniqueId = envelope.UniqueId
             };
 
-            foreach (var property in envelope.Properties)
-                message.Properties.Add(property.Key, property.Value);
+            if (envelope.Properties is not null)
+            {
+                foreach (var property in envelope.Properties)
+                    message.Properties.Add(property.Key, property.Value);
+            }
         }
         catch (Exception ex)
         {
@@ -183,6 +186,6 @@ public class RedisMessageEnvelope
     public string? UniqueId { get; set; }
     public string? CorrelationId { get; set; }
     public string? Type { get; set; }
-    public byte[] Data { get; set; } = null!;
-    public Dictionary<string, string> Properties { get; set; } = new Dictionary<string, string>();
+    public byte[]? Data { get; set; }
+    public Dictionary<string, string>? Properties { get; set; } = new Dictionary<string, string>();
 }

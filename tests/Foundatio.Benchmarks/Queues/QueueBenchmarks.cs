@@ -63,8 +63,9 @@ public class QueueBenchmarks
         {
             for (int i = 0; i < ITEM_COUNT; i++)
             {
-                var entry = queue.DequeueAsync(TimeSpan.Zero).GetAwaiter().GetResult();
-                entry?.CompleteAsync().GetAwaiter().GetResult();
+                var entry = queue.DequeueAsync(TimeSpan.Zero).GetAwaiter().GetResult()
+                    ?? throw new InvalidOperationException($"Expected a queue entry at index {i}, but dequeue returned null.");
+                entry.CompleteAsync().GetAwaiter().GetResult();
             }
         }
         catch (Exception ex)

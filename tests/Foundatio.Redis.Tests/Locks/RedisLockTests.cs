@@ -25,7 +25,7 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
     protected RedisLockTests(ITestOutputHelper output, RedisProtocol? protocol) : base(output)
     {
         _protocol = protocol;
-        var muxer = SharedConnection.GetMuxer(Log, _protocol)!;
+        var muxer = SharedConnection.GetMuxer(Log, _protocol);
         _cache = new RedisCacheClient(o => o.ConnectionMultiplexer(muxer).LoggerFactory(Log));
         _messageBus = new RedisMessageBus(o => o.Subscriber(muxer.GetSubscriber()).Topic(_topic).LoggerFactory(Log));
     }
@@ -115,7 +115,7 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
-        var muxer = SharedConnection.GetMuxer(Log, Protocol)!;
+        var muxer = SharedConnection.GetMuxer(Log, Protocol);
         return new ValueTask(muxer.FlushAllAsync());
     }
 
