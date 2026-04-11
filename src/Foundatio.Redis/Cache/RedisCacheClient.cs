@@ -41,7 +41,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     public RedisCacheClient(RedisCacheClientOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer);
+        ArgumentNullException.ThrowIfNull(options?.ConnectionMultiplexer);
 
         _options = options;
         _connectionMultiplexer = options.ConnectionMultiplexer;

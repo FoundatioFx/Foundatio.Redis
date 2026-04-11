@@ -13,19 +13,35 @@ internal static class RedisValueExtensions
 
     /// <summary>
     /// Converts a <see cref="RedisValue"/> to the specified type <typeparamref name="T"/>.
-    /// Handles primitive types, nullable types, and complex types via serializer.
+    /// Handles null/empty Redis values, primitive types (bool, string, numeric), nullable
+    /// numeric types, and falls back to the <paramref name="serializer"/> for complex types.
+    /// Follows the same conversion strategy as <c>TypeExtensions.ToType&lt;T&gt;</c> in Foundatio core.
     /// </summary>
-    /// <returns>The converted value, or <c>default</c> for null <see cref="RedisValue"/> with nullable target types.</returns>
+    /// <typeparam name="T">The target type to convert to.</typeparam>
+    /// <param name="redisValue">The Redis value to convert.</param>
+    /// <param name="serializer">Serializer used for complex (non-primitive) types.</param>
+    /// <returns>
+    /// The converted value, or <c>default</c> when <paramref name="redisValue"/> is null/empty
+    /// and <typeparamref name="T"/> is a reference or nullable type.
+    /// </returns>
     [return: MaybeNull]
     public static T ToValueOfType<T>(this RedisValue redisValue, ISerializer serializer)
     {
+        if (redisValue.IsNull)
+        {
+            if (!typeof(T).IsValueType || Nullable.GetUnderlyingType(typeof(T)) is not null)
+                return default!;
+
+            return default!;
+        }
+
         var type = typeof(T);
 
         if (type == TypeHelper.BoolType || type == TypeHelper.StringType || type.IsNumeric())
             return (T)Convert.ChangeType(redisValue, type)!;
 
         if (type == TypeHelper.NullableBoolType || type.IsNullableNumeric())
-            return redisValue.IsNull ? default! : (T)Convert.ChangeType(redisValue, Nullable.GetUnderlyingType(type)!)!;
+            return (T)Convert.ChangeType(redisValue, Nullable.GetUnderlyingType(type)!)!;
 
         return serializer.Deserialize<T>(((byte[]?)redisValue)!);
     }

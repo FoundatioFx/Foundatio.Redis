@@ -133,11 +133,11 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
     {
         if (options.DeliveryDelay.HasValue && options.DeliveryDelay.Value > TimeSpan.Zero)
         {
-            _logger.LogTrace("Schedule delayed message: {MessageType} ({Delay}ms)", messageType, options.DeliveryDelay.Value.TotalMilliseconds);
             var mappedType = GetMappedMessageType(messageType);
             if (mappedType is null)
                 throw new MessageBusException($"Unable to resolve CLR type for delayed message: {messageType}");
 
+            _logger.LogTrace("Schedule delayed message: {MessageType} ({Delay}ms)", messageType, options.DeliveryDelay.Value.TotalMilliseconds);
             SendDelayedMessage(mappedType, message, options);
             return;
         }

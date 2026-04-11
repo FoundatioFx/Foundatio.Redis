@@ -374,7 +374,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error deserializing queue entry payload: {WorkId}, abandoning for retry", value);
-            var poisonEntry = new QueueEntry<T>(value!, null, default!, this, _timeProvider.GetUtcNow().UtcDateTime, 0);
+            var poisonEntry = new QueueEntry<T>(value!, null, null, this, _timeProvider.GetUtcNow().UtcDateTime, 0);
             await AbandonAsync(poisonEntry).AnyContext();
             return null;
         }
@@ -431,7 +431,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                     now,
                     timeout = timeout.TotalMilliseconds
                 }).AnyContext();
-                return result.ToString();
+                return (RedisValue)result;
             }, linkedCancellationToken).AnyContext();
         }
         catch (Exception ex)
