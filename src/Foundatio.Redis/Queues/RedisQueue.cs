@@ -872,9 +872,9 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
     private static readonly string DequeueIdScript = EmbeddedResourceLoader.GetEmbeddedResource("Foundatio.Redis.Scripts.DequeueId.lua");
 }
 
-public class RedisPayloadEnvelope<T>
+public record RedisPayloadEnvelope<T>
 {
-    public string? CorrelationId { get; set; }
-    public IDictionary<string, string>? Properties { get; set; }
-    public T Value { get; set; } = default!;
+    public string? CorrelationId { get; init; }
+    public IDictionary<string, string>? Properties { get; init; }
+    public required T Value { get; init; }
 }

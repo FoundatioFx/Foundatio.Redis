@@ -20,7 +20,10 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
 
     protected override ICacheClient GetCacheClient(bool shouldThrowOnSerializationError = true)
     {
-        return new RedisCacheClient(o => o.ConnectionMultiplexer(SharedConnection.GetRequiredMuxer(Log, Protocol)).LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError));
+        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        if (muxer is null)
+            return null!;
+        return new RedisCacheClient(o => o.ConnectionMultiplexer(muxer).LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError));
     }
 
     [Fact]
@@ -636,7 +639,10 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     [Fact]
     public async Task GetListAsync_WithExistingFormat_UpgradeListType()
     {
-        var db = SharedConnection.GetRequiredMuxer(Log, Protocol).GetDatabase();
+        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        if (muxer is null)
+            return;
+        var db = muxer.GetDatabase();
         var cache = GetCacheClient();
         if (cache == null)
             return;
@@ -681,7 +687,9 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
-        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        if (muxer is null)
+            return ValueTask.CompletedTask;
         return new ValueTask(muxer.FlushAllAsync());
     }
 

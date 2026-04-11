@@ -42,14 +42,4 @@ public static class SharedConnection
             return muxer;
         }
     }
-
-    /// <summary>
-    /// Returns a shared ConnectionMultiplexer or throws if RedisConnectionString is not configured.
-    /// Use this in test setup and test methods that require a live Redis connection.
-    /// </summary>
-    public static ConnectionMultiplexer GetRequiredMuxer(ILoggerFactory loggerFactory, RedisProtocol? protocol = null)
-    {
-        return GetMuxer(loggerFactory, protocol)
-            ?? throw new InvalidOperationException("RedisConnectionString is not configured. Set it in appsettings.json to run Redis integration tests.");
-    }
 }

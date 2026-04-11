@@ -18,7 +18,10 @@ public class ScopedRedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
 
     protected override ICacheClient GetCacheClient(bool shouldThrowOnSerializationError = true)
     {
-        return new ScopedCacheClient(new RedisCacheClient(o => o.ConnectionMultiplexer(SharedConnection.GetRequiredMuxer(Log, Protocol)).LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError)), "scoped");
+        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        if (muxer is null)
+            return null!;
+        return new ScopedCacheClient(new RedisCacheClient(o => o.ConnectionMultiplexer(muxer).LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError)), "scoped");
     }
 
     [Fact]
@@ -585,7 +588,9 @@ public class ScopedRedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     public ValueTask InitializeAsync()
     {
         _logger.LogDebug("Initializing");
-        var muxer = SharedConnection.GetRequiredMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        if (muxer is null)
+            return ValueTask.CompletedTask;
         return new ValueTask(muxer.FlushAllAsync());
     }
 
