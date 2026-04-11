@@ -32,7 +32,7 @@ internal static class RedisValueExtensions
             if (!typeof(T).IsValueType || Nullable.GetUnderlyingType(typeof(T)) is not null)
                 return default!;
 
-            return default!;
+            throw new ArgumentNullException(nameof(redisValue));
         }
 
         var type = typeof(T);

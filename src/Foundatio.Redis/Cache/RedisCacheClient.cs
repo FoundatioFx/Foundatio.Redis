@@ -41,7 +41,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     public RedisCacheClient(RedisCacheClientOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(options?.ConnectionMultiplexer);
+        ArgumentNullException.ThrowIfNull(options.ConnectionMultiplexer);
 
         _options = options;
         _connectionMultiplexer = options.ConnectionMultiplexer;
@@ -257,8 +257,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             try
             {
                 var value = redisValue.ToValueOfType<T>(_options.Serializer);
-                if (value is not null)
-                    result.Add(value);
+                result.Add(value!);
             }
             catch (Exception ex)
             {
@@ -282,7 +281,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         try
         {
             var value = redisValue.ToValueOfType<T>(_options.Serializer);
-            return value is not null ? new CacheValue<T>(value, true) : CacheValue<T>.Null;
+            return new CacheValue<T>(value, true);
         }
         catch (Exception ex)
         {
