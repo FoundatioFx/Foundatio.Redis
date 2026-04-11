@@ -41,9 +41,15 @@ internal static class RedisValueExtensions
             return (T)Convert.ChangeType(redisValue, type)!;
 
         if (type == TypeHelper.NullableBoolType || type.IsNullableNumeric())
-            return (T)Convert.ChangeType(redisValue, Nullable.GetUnderlyingType(type)!)!;
+        {
+            var underlyingType = Nullable.GetUnderlyingType(type)
+                ?? throw new InvalidOperationException($"Expected nullable type but {type.Name} has no underlying type");
+            return (T)Convert.ChangeType(redisValue, underlyingType)!;
+        }
 
-        return serializer.Deserialize<T>(((byte[]?)redisValue)!);
+        byte[] bytes = (byte[]?)redisValue
+            ?? throw new InvalidOperationException($"Expected non-null byte[] from RedisValue for type {typeof(T).Name}");
+        return serializer.Deserialize<T>(bytes);
     }
 
     /// <summary>
