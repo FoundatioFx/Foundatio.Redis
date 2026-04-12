@@ -37,13 +37,21 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
         _messageBus = new RedisMessageBus(o => o.Subscriber(muxer.GetSubscriber()).Topic(_topic).LoggerFactory(Log));
     }
 
-    protected override ILockProvider GetThrottlingLockProvider(int maxHits, TimeSpan period)
+    protected override ILockProvider? GetThrottlingLockProvider(int maxHits, TimeSpan period)
     {
+        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        if (muxer is null)
+            return null;
+
         return new ThrottlingLockProvider(_cache, maxHits, period, null, null, Log);
     }
 
-    protected override ILockProvider GetLockProvider()
+    protected override ILockProvider? GetLockProvider()
     {
+        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        if (muxer is null)
+            return null;
+
         return new CacheLockProvider(_cache, _messageBus, null, null, Log);
     }
 
