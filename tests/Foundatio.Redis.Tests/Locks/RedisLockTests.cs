@@ -25,13 +25,8 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
     protected RedisLockTests(ITestOutputHelper output, RedisProtocol? protocol) : base(output)
     {
         _protocol = protocol;
-        var muxer = SharedConnection.GetMuxer(Log, _protocol);
-        if (muxer is null)
-        {
-            _cache = null!;
-            _messageBus = null!;
-            return;
-        }
+        var muxer = SharedConnection.GetMuxer(Log, _protocol)
+            ?? throw new InvalidOperationException("Redis connection is not configured. Set the RedisConnectionString environment variable.");
 
         _cache = new RedisCacheClient(o => o.ConnectionMultiplexer(muxer).LoggerFactory(Log));
         _messageBus = new RedisMessageBus(o => o.Subscriber(muxer.GetSubscriber()).Topic(_topic).LoggerFactory(Log));

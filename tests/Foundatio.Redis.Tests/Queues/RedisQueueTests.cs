@@ -268,15 +268,15 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
         using (queue)
         {
             var muxer = SharedConnection.GetMuxer(Log, Protocol);
-        if (muxer is null)
-            return;
+            if (muxer is null)
+                return;
 
-        var db = muxer.GetDatabase();
-        string listPrefix = muxer.IsCluster() ? "{q:SimpleWorkItem}" : "q:SimpleWorkItem";
+            var db = muxer.GetDatabase();
+            string listPrefix = muxer.IsCluster() ? "{q:SimpleWorkItem}" : "q:SimpleWorkItem";
 
-        string? id = await queue.EnqueueAsync(new SimpleWorkItem { Data = "blah", Id = 1 });
-        Assert.NotNull(id);
-        Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}"));
+            string? id = await queue.EnqueueAsync(new SimpleWorkItem { Data = "blah", Id = 1 });
+            Assert.NotNull(id);
+            Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}"));
             Assert.Equal(1, await db.ListLengthAsync($"{listPrefix}:in"));
             Assert.True(await db.KeyExistsAsync($"{listPrefix}:{id}:enqueued"));
             Assert.Equal(3, await muxer.CountAllKeysAsync());
