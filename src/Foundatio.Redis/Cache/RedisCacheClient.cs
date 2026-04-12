@@ -320,7 +320,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
                 // Non-existent keys return nil/empty values in their respective positions.
                 // https://redis.io/commands/mget
                 for (int i = 0; i < hashSlotKeys.Length; i++)
-                    result[(string)hashSlotKeys[i]!] = RedisValueToCacheValue<T>(values[i]);
+                    result[hashSlotKeys[i].ToString()] = RedisValueToCacheValue<T>(values[i]);
             }
 
             return result.AsReadOnly();
@@ -332,7 +332,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
             // Redis MGET guarantees that values are returned in the same order as keys
             for (int i = 0; i < redisKeys.Count; i++)
-                result[(string)redisKeys[i]!] = RedisValueToCacheValue<T>(values[i]);
+                result[redisKeys[i].ToString()] = RedisValueToCacheValue<T>(values[i]);
 
             return result.AsReadOnly();
         }
@@ -902,7 +902,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             var result = new Dictionary<string, TimeSpan?>();
             for (int keyIndex = 0; keyIndex < redisKeys.Length; keyIndex++)
             {
-                string key = (string)redisKeys[keyIndex]!;
+                string key = redisKeys[keyIndex].ToString();
                 long ttl = ttls[keyIndex];
                 if (ttl == -2) // Key doesn't exist - omit from result
                     continue;

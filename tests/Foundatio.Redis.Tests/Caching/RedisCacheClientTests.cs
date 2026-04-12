@@ -18,11 +18,12 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     {
     }
 
-    protected override ICacheClient GetCacheClient(bool shouldThrowOnSerializationError = true)
+    protected override ICacheClient? GetCacheClient(bool shouldThrowOnSerializationError = true)
     {
         var muxer = SharedConnection.GetMuxer(Log, Protocol);
         if (muxer is null)
-            return null!;
+            return null;
+
         return new RedisCacheClient(o => o.ConnectionMultiplexer(muxer).LoggerFactory(Log).ShouldThrowOnSerializationError(shouldThrowOnSerializationError));
     }
 
@@ -642,9 +643,10 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
         var muxer = SharedConnection.GetMuxer(Log, Protocol);
         if (muxer is null)
             return;
+
         var db = muxer.GetDatabase();
         var cache = GetCacheClient();
-        if (cache == null)
+        if (cache is null)
             return;
 
         using (cache)
@@ -690,6 +692,7 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
         var muxer = SharedConnection.GetMuxer(Log, Protocol);
         if (muxer is null)
             return ValueTask.CompletedTask;
+
         return new ValueTask(muxer.FlushAllAsync());
     }
 

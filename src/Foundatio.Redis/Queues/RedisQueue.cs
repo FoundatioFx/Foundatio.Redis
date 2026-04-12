@@ -352,9 +352,10 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
         if (value.IsNullOrEmpty)
             return null;
 
+        string workId = value.ToString();
         try
         {
-            var entry = await GetQueueEntryAsync(value!).AnyContext();
+            var entry = await GetQueueEntryAsync(workId).AnyContext();
             if (entry is null)
                 return null;
 
@@ -374,7 +375,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error deserializing queue entry payload: {WorkId}, abandoning for retry", value);
-            var poisonEntry = new QueueEntry<T>(value!, null, null, this, _timeProvider.GetUtcNow().UtcDateTime, 0);
+            var poisonEntry = new QueueEntry<T>(workId, null, null, this, _timeProvider.GetUtcNow().UtcDateTime, 0);
             await AbandonAsync(poisonEntry).AnyContext();
             return null;
         }
@@ -599,7 +600,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
 
         var tasks = new List<Task>(itemIds.Length + 1);
         foreach (var id in itemIds)
-            tasks.Add(DeleteIdKeysAsync(id!));
+            tasks.Add(DeleteIdKeysAsync(id.ToString()));
 
         tasks.Add(Database.KeyDeleteAsync(name));
         await Task.WhenAll(tasks).AnyContext();
@@ -630,7 +631,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
         foreach (var id in itemIds)
         {
             tasks.AddRange([
-                DeleteIdKeysAsync(id!),
+                DeleteIdKeysAsync(id.ToString()),
                 Database.ListRemoveAsync(_queueListName, id),
                 Database.ListRemoveAsync(_workListName, id),
                 Database.ListRemoveAsync(_waitListName, id),
@@ -670,7 +671,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                 if (DisposedCancellationToken.IsCancellationRequested)
                     return;
 
-                var renewedTimeTicks = await _cache.GetAsync<long>(GetRenewedTimeKey(workId!)).AnyContext();
+                var renewedTimeTicks = await _cache.GetAsync<long>(GetRenewedTimeKey(workId.ToString())).AnyContext();
                 if (!renewedTimeTicks.HasValue)
                 {
                     _logger.LogTrace("Skipping {WorkId}: no renewed time", workId);
@@ -684,7 +685,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                     continue;
 
                 _logger.LogInformation("{WorkId} Auto abandon item. Renewed: {RenewedTime:o} Current: {UtcNow:o} Timeout: {WorkItemTimeout:g} QueueId: {QueueId}", workId, renewedTime, utcNow, _options.WorkItemTimeout, QueueId);
-                var entry = await GetQueueEntryAsync(workId!).AnyContext();
+                var entry = await GetQueueEntryAsync(workId.ToString()).AnyContext();
                 if (entry == null)
                 {
                     _logger.LogError("{WorkId} Error getting queue entry for work item timeout", workId);
@@ -712,7 +713,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                 if (DisposedCancellationToken.IsCancellationRequested)
                     return;
 
-                var waitTimeTicks = await _cache.GetAsync<long>(GetWaitTimeKey(waitId!)).AnyContext();
+                var waitTimeTicks = await _cache.GetAsync<long>(GetWaitTimeKey(waitId.ToString())).AnyContext();
                 _logger.LogTrace("{WaitId}: Wait time {WaitTime}", waitId, waitTimeTicks);
 
                 if (waitTimeTicks.HasValue && waitTimeTicks.Value > utcNow.Ticks)
@@ -724,7 +725,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                 var tx = Database.CreateTransaction();
                 tx.ListRemoveAsync(_waitListName, waitId);
                 tx.ListLeftPushAsync(_queueListName, waitId);
-                tx.KeyDeleteAsync(GetWaitTimeKey(waitId!));
+                tx.KeyDeleteAsync(GetWaitTimeKey(waitId.ToString()));
                 bool success = await _resiliencePolicy.ExecuteAsync(async _ => await tx.ExecuteAsync()).AnyContext();
                 if (!success)
                     throw new Exception("Unable to move item to queue list.");

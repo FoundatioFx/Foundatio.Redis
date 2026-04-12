@@ -52,7 +52,7 @@ public class RedisFileStorage : IFileStorage
         _connectionMultiplexer.ConnectionRestored -= ConnectionMultiplexerOnConnectionRestored;
     }
 
-    [Obsolete($"Use {nameof(GetFileStreamAsync)} with {nameof(FileAccess)} instead to define read or write behaviour of stream")]
+    [Obsolete($"Use {nameof(GetFileStreamAsync)} with {nameof(StreamMode)} instead to define read or write behaviour of stream")]
     public Task<Stream?> GetFileStreamAsync(string path, CancellationToken cancellationToken = default)
         => GetFileStreamAsync(path, StreamMode.Read, cancellationToken);
 
@@ -78,7 +78,7 @@ public class RedisFileStorage : IFileStorage
             return null;
         }
 
-        return new MemoryStream((byte[]?)fileContent ?? []);
+        return new MemoryStream((byte[])fileContent!);
     }
 
     public async Task<FileSpec?> GetFileInfoAsync(string path)
@@ -96,7 +96,7 @@ public class RedisFileStorage : IFileStorage
             return null;
         }
 
-        return _serializer.Deserialize<FileSpec>((byte[]?)fileSpec ?? []);
+        return _serializer.Deserialize<FileSpec>((byte[])fileSpec!);
     }
 
     public async Task<bool> ExistsAsync(string path)
@@ -270,7 +270,7 @@ public class RedisFileStorage : IFileStorage
 
         return Task.FromResult(Database.HashScan(_fileSpecContainer, $"{prefix}*", flags: _options.ReadMode)
             .Where(entry => entry.Value.HasValue)
-            .Select(entry => _serializer.Deserialize<FileSpec>((byte[]?)entry.Value ?? []))
+            .Select(entry => _serializer.Deserialize<FileSpec>((byte[])entry.Value!))
             .Where(fileSpec => fileSpec is not null && (patternRegex is null || patternRegex.IsMatch(fileSpec.Path)))
             .Cast<FileSpec>()
             .Take(pageSize)
@@ -303,7 +303,7 @@ public class RedisFileStorage : IFileStorage
 
         var list = Database.HashScan(_fileSpecContainer, $"{criteria.Prefix}*", flags: _options.ReadMode)
             .Where(entry => entry.Value.HasValue)
-            .Select(entry => _serializer.Deserialize<FileSpec>((byte[]?)entry.Value ?? []))
+            .Select(entry => _serializer.Deserialize<FileSpec>((byte[])entry.Value!))
             .Where(fileSpec => fileSpec is not null && (criteria.Pattern is null || criteria.Pattern.IsMatch(fileSpec.Path)))
             .Cast<FileSpec>()
             .Skip(skip)
