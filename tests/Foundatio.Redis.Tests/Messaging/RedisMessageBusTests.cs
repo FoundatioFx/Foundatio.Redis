@@ -25,11 +25,12 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
     {
     }
 
-    protected override IMessageBus GetMessageBus(Func<SharedMessageBusOptions, SharedMessageBusOptions>? config = null)
+    protected override IMessageBus? GetMessageBus(Func<SharedMessageBusOptions, SharedMessageBusOptions>? config = null)
     {
         var muxer = SharedConnection.GetMuxer(Log, Protocol);
         if (muxer is null)
-            return null!;
+            return null;
+
         return new RedisMessageBus(o =>
         {
             o.Subscriber(muxer.GetSubscriber());
@@ -198,6 +199,7 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
         var muxer = SharedConnection.GetMuxer(Log, Protocol);
         if (muxer is null)
             return;
+
         var messageBus1 = new RedisMessageBus(new RedisMessageBusOptions { Subscriber = muxer.GetSubscriber(), Topic = _topic, LoggerFactory = Log });
 
         var cache = new RedisCacheClient(new RedisCacheClientOptions { ConnectionMultiplexer = muxer });
@@ -247,12 +249,14 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
         var muxer = SharedConnection.GetMuxer(Log, Protocol);
         if (muxer is null)
             return ValueTask.CompletedTask;
+
         return new ValueTask(muxer.FlushAllAsync());
     }
 
     public ValueTask DisposeAsync()
     {
         _logger.LogDebug("Disposing");
+
         return ValueTask.CompletedTask;
     }
 }

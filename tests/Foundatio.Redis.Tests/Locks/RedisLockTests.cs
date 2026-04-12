@@ -26,8 +26,15 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
     {
         _protocol = protocol;
         var muxer = SharedConnection.GetMuxer(Log, _protocol);
-        _cache = muxer is null ? null! : new RedisCacheClient(o => o.ConnectionMultiplexer(muxer).LoggerFactory(Log));
-        _messageBus = muxer is null ? null! : new RedisMessageBus(o => o.Subscriber(muxer.GetSubscriber()).Topic(_topic).LoggerFactory(Log));
+        if (muxer is null)
+        {
+            _cache = null!;
+            _messageBus = null!;
+            return;
+        }
+
+        _cache = new RedisCacheClient(o => o.ConnectionMultiplexer(muxer).LoggerFactory(Log));
+        _messageBus = new RedisMessageBus(o => o.Subscriber(muxer.GetSubscriber()).Topic(_topic).LoggerFactory(Log));
     }
 
     protected override ILockProvider GetThrottlingLockProvider(int maxHits, TimeSpan period)
@@ -118,6 +125,7 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
         var muxer = SharedConnection.GetMuxer(Log, Protocol);
         if (muxer is null)
             return ValueTask.CompletedTask;
+
         return new ValueTask(muxer.FlushAllAsync());
     }
 

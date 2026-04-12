@@ -699,6 +699,7 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     public ValueTask DisposeAsync()
     {
         _logger.LogDebug("Disposing");
+
         return ValueTask.CompletedTask;
     }
 }

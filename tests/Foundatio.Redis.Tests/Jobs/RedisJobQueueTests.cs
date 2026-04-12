@@ -22,6 +22,7 @@ public class RedisJobQueueTests : JobQueueTestsBase, IAsyncLifetime
         var muxer = SharedConnection.GetMuxer(Log, Protocol);
         if (muxer is null)
             return null!;
+
         return new RedisQueue<SampleQueueWorkItem>(o => o
             .ConnectionMultiplexer(muxer)
             .Retries(retries)
@@ -60,6 +61,7 @@ public class RedisJobQueueTests : JobQueueTestsBase, IAsyncLifetime
         var muxer = SharedConnection.GetMuxer(Log, Protocol);
         if (muxer is null)
             return ValueTask.CompletedTask;
+
         return new ValueTask(muxer.FlushAllAsync());
     }
 
