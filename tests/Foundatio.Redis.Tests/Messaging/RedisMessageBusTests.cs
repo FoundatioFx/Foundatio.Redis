@@ -170,6 +170,42 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
     }
 
     [Fact]
+    public override Task DisposeAsync_CalledMultipleTimes_IsIdempotentAsync()
+    {
+        return base.DisposeAsync_CalledMultipleTimes_IsIdempotentAsync();
+    }
+
+    [Fact]
+    public override Task DisposeAsync_WhilePublishing_CompletesWithoutDeadlockAsync()
+    {
+        return base.DisposeAsync_WhilePublishing_CompletesWithoutDeadlockAsync();
+    }
+
+    [Fact]
+    public override Task DisposeAsync_WithNoSubscribersOrPublishers_CompletesWithoutExceptionAsync()
+    {
+        return base.DisposeAsync_WithNoSubscribersOrPublishers_CompletesWithoutExceptionAsync();
+    }
+
+    [Fact]
+    public override Task PublishAsync_AfterDispose_ThrowsMessageBusExceptionAsync()
+    {
+        return base.PublishAsync_AfterDispose_ThrowsMessageBusExceptionAsync();
+    }
+
+    [Fact]
+    public override Task SubscribeAsync_AfterDispose_ThrowsMessageBusExceptionAsync()
+    {
+        return base.SubscribeAsync_AfterDispose_ThrowsMessageBusExceptionAsync();
+    }
+
+    [Fact]
+    public override Task SubscribeAsync_CancelledToken_DoesNotTearDownInfrastructureAsync()
+    {
+        return base.SubscribeAsync_CancelledToken_DoesNotTearDownInfrastructureAsync();
+    }
+
+    [Fact]
     public override Task CanHandlePoisonedMessageAsync()
     {
         return base.CanHandlePoisonedMessageAsync();
