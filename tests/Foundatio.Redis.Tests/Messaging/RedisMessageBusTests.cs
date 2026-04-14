@@ -164,9 +164,9 @@ public class RedisMessageBusTests : MessageBusTestBase, IAsyncLifetime
     }
 
     [Fact]
-    public override void CanDisposeWithNoSubscribersOrPublishers()
+    public override Task CanDisposeWithNoSubscribersOrPublishersAsync()
     {
-        base.CanDisposeWithNoSubscribersOrPublishers();
+        return base.CanDisposeWithNoSubscribersOrPublishersAsync();
     }
 
     [Fact]
