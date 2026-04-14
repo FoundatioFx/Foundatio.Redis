@@ -117,6 +117,10 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
         {
             await SendMessageToSubscribersAsync(message).AnyContext();
         }
+        catch (OperationCanceledException)
+        {
+            // Bus is disposing — Redis pub/sub is fire-and-forget, message is lost
+        }
         catch (MessageBusException)
         {
             // SendMessageToSubscribersAsync already logged the error
@@ -124,7 +128,6 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
         }
         catch (Exception ex)
         {
-            // Catch any other unexpected exceptions for defensive purposes
             _logger.LogError(ex, "OnMessage({Channel}) Error in subscriber: {Message}", channelMessage.Channel, ex.Message);
         }
     }
@@ -160,13 +163,11 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
             cancellationToken).AnyContext();
     }
 
-    public override void Dispose()
+    protected override async Task CleanupAsync()
     {
-        base.Dispose();
-
         if (_isSubscribed)
         {
-            using (_lock.Lock())
+            using (await _lock.LockAsync().AnyContext())
             {
                 if (!_isSubscribed)
                     return;
