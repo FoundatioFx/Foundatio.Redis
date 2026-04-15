@@ -117,7 +117,7 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
         {
             await SendMessageToSubscribersAsync(message).AnyContext();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (IsDisposed)
         {
             // Bus is disposing — Redis pub/sub is fire-and-forget, message is lost
         }
