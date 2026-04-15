@@ -171,6 +171,9 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
 
         using (await _lock.LockAsync().AnyContext())
         {
+            if (!_isSubscribed)
+                return;
+
             if (_channelMessageQueue is not null)
             {
                 _logger.LogTrace("Unsubscribing from topic {Topic}", _options.Topic);
@@ -183,9 +186,10 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
                     _logger.LogError(ex, "Error unsubscribing from topic {Topic}: {Message}", _options.Topic, ex.Message);
                 }
                 _channelMessageQueue = null;
-                _isSubscribed = false;
-                _logger.LogTrace("Unsubscribed from topic {Topic}", _options.Topic);
             }
+
+            _isSubscribed = false;
+            _logger.LogTrace("Unsubscribed from topic {Topic}", _options.Topic);
         }
     }
 }
