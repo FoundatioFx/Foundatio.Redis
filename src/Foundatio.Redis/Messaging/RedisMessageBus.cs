@@ -128,6 +128,7 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
         }
         catch (Exception ex)
         {
+            // Catch any other unexpected exceptions for defensive purposes
             _logger.LogError(ex, "OnMessage({Channel}) Error in subscriber: {Message}", channelMessage.Channel, ex.Message);
         }
     }
@@ -165,6 +166,9 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
 
     protected override async Task CleanupAsync()
     {
+        if (!_isSubscribed)
+            return;
+
         using (await _lock.LockAsync().AnyContext())
         {
             if (_channelMessageQueue is not null)
