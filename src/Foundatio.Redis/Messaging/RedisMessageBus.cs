@@ -165,17 +165,14 @@ public class RedisMessageBus : MessageBusBase<RedisMessageBusOptions>
 
     protected override async Task CleanupAsync()
     {
-        if (_isSubscribed)
+        using (await _lock.LockAsync().AnyContext())
         {
-            using (await _lock.LockAsync().AnyContext())
+            if (_channelMessageQueue is not null)
             {
-                if (!_isSubscribed)
-                    return;
-
                 _logger.LogTrace("Unsubscribing from topic {Topic}", _options.Topic);
                 try
                 {
-                    _channelMessageQueue?.Unsubscribe(CommandFlags.FireAndForget);
+                    _channelMessageQueue.Unsubscribe(CommandFlags.FireAndForget);
                 }
                 catch (Exception ex)
                 {
