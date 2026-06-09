@@ -20,6 +20,7 @@ public class RedisFileStorage : IFileStorage
     private readonly IConnectionMultiplexer _connectionMultiplexer;
     private readonly ISerializer _serializer;
     private readonly IResiliencePolicy _resiliencePolicy;
+    private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
     private readonly string _fileSpecContainer;
 
@@ -31,6 +32,7 @@ public class RedisFileStorage : IFileStorage
         _options = options;
         _connectionMultiplexer = options.ConnectionMultiplexer;
         _serializer = options.Serializer ?? DefaultSerializer.Instance;
+        _timeProvider = options.TimeProvider ?? TimeProvider.System;
         _logger = options.LoggerFactory?.CreateLogger(GetType()) ?? NullLogger.Instance;
 
         _resiliencePolicy = options.ResiliencePolicyProvider.GetPolicy<RedisFileStorage, IFileStorage>(_logger, options.TimeProvider);
@@ -132,8 +134,8 @@ public class RedisFileStorage : IFileStorage
             _serializer.Serialize(new FileSpec
             {
                 Path = normalizedPath,
-                Created = DateTime.UtcNow,
-                Modified = DateTime.UtcNow,
+                Created = _timeProvider.GetUtcNow().UtcDateTime,
+                Modified = _timeProvider.GetUtcNow().UtcDateTime,
                 Size = fileSize
             }, memory);
 
@@ -228,14 +230,18 @@ public class RedisFileStorage : IFileStorage
     public async Task<int> DeleteFilesAsync(string? searchPattern = null, CancellationToken cancellationToken = default)
     {
         var files = await GetFileListAsync(searchPattern, cancellationToken: cancellationToken).AnyContext();
-        int count = 0;
+        if (files.Count == 0)
+            return 0;
 
-        _logger.LogInformation("Deleting {FileCount} files matching {SearchPattern}", files.Count, searchPattern);
-        foreach (var file in files)
-        {
-            await DeleteFileAsync(file.Path, cancellationToken).AnyContext();
-            count++;
-        }
+        var fields = files.Select(f => (RedisValue)f.Path).ToArray();
+        _logger.LogInformation("Deleting {FileCount} files matching {SearchPattern}", fields.Length, searchPattern);
+
+        var database = Database;
+        var deleteContentTask = database.HashDeleteAsync(_options.ContainerName, fields);
+        var deleteSpecTask = database.HashDeleteAsync(_fileSpecContainer, fields);
+        await _resiliencePolicy.ExecuteAsync(async _ => await Task.WhenAll(deleteContentTask, deleteSpecTask), cancellationToken).AnyContext();
+
+        int count = (int)Math.Max(deleteContentTask.Result, deleteSpecTask.Result);
         _logger.LogTrace("Finished deleting {FileCount} files matching {SearchPattern}", count, searchPattern);
 
         return count;
