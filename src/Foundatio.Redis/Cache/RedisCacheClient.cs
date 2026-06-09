@@ -665,7 +665,6 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         return msetSuccess ? pairs.Length : 0;
     }
 
-
     public Task<bool> ReplaceAsync<T>(string key, T value, TimeSpan? expiresIn = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);

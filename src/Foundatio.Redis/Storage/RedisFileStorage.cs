@@ -131,11 +131,12 @@ public class RedisFileStorage : IFileStorage
             memory.Seek(0, SeekOrigin.Begin);
             memory.SetLength(0);
 
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             _serializer.Serialize(new FileSpec
             {
                 Path = normalizedPath,
-                Created = _timeProvider.GetUtcNow().UtcDateTime,
-                Modified = _timeProvider.GetUtcNow().UtcDateTime,
+                Created = now,
+                Modified = now,
                 Size = fileSize
             }, memory);
 
@@ -237,14 +238,18 @@ public class RedisFileStorage : IFileStorage
         _logger.LogInformation("Deleting {FileCount} files matching {SearchPattern}", fields.Length, searchPattern);
 
         var database = Database;
-        var deleteContentTask = database.HashDeleteAsync(_options.ContainerName, fields);
-        var deleteSpecTask = database.HashDeleteAsync(_fileSpecContainer, fields);
-        await _resiliencePolicy.ExecuteAsync(async _ => await Task.WhenAll(deleteContentTask, deleteSpecTask), cancellationToken).AnyContext();
+        long deleted = 0;
+        await _resiliencePolicy.ExecuteAsync(async _ =>
+        {
+            var deleteContentTask = database.HashDeleteAsync(_options.ContainerName, fields);
+            var deleteSpecTask = database.HashDeleteAsync(_fileSpecContainer, fields);
+            await Task.WhenAll(deleteContentTask, deleteSpecTask).AnyContext();
+            deleted = deleteContentTask.Result;
+        }, cancellationToken).AnyContext();
 
-        int count = (int)Math.Max(deleteContentTask.Result, deleteSpecTask.Result);
-        _logger.LogTrace("Finished deleting {FileCount} files matching {SearchPattern}", count, searchPattern);
+        _logger.LogTrace("Finished deleting {FileCount} files matching {SearchPattern}", deleted, searchPattern);
 
-        return count;
+        return (int)deleted;
     }
 
     private Task<List<FileSpec>> GetFileListAsync(string? searchPattern = null, int? limit = null, int? skip = null, CancellationToken cancellationToken = default)

@@ -8,13 +8,11 @@ namespace Foundatio.Redis.Utility;
 internal sealed class RedisCapabilities
 {
     private static readonly Version MsetexMinVersion = new(8, 3, 224);
-    private static readonly Version CasCadMinVersion = new(8, 3, 224);
 
     private readonly IConnectionMultiplexer _muxer;
     private readonly ILogger _logger;
 
     private int _msetex; // 0 = unknown, 1 = supported, -1 = not supported
-    private int _casCad;
 
     public RedisCapabilities(IConnectionMultiplexer muxer, ILogger logger)
     {
@@ -26,12 +24,9 @@ internal sealed class RedisCapabilities
 
     public bool SupportsMsetex => CheckVersion(ref _msetex, MsetexMinVersion, "MSETEX");
 
-    public bool SupportsCasCad => CheckVersion(ref _casCad, CasCadMinVersion, "CAS/CAD");
-
     public void Invalidate()
     {
         Volatile.Write(ref _msetex, 0);
-        Volatile.Write(ref _casCad, 0);
     }
 
     private bool CheckVersion(ref int cached, Version minVersion, string featureName)
