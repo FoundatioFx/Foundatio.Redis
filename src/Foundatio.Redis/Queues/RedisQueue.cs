@@ -809,13 +809,11 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
     // IConnectionMultiplexer supports IAsyncDisposable since SE.Redis 2.6.66.
     public override void Dispose()
     {
-        if (IsDisposed)
+        if (!SignalDispose())
         {
             _logger.LogTrace("Queue {QueueName} ({QueueId}) dispose was already called", _options.Name, QueueId);
             return;
         }
-
-        SignalDispose();
         _connectionMultiplexer.ConnectionRestored -= ConnectionMultiplexerOnConnectionRestored;
 
         if (_isSubscribed)
