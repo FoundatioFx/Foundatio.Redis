@@ -131,12 +131,12 @@ public class RedisFileStorage : IFileStorage
             memory.Seek(0, SeekOrigin.Begin);
             memory.SetLength(0);
 
-            var now = _timeProvider.GetUtcNow().UtcDateTime;
+            var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
             _serializer.Serialize(new FileSpec
             {
                 Path = normalizedPath,
-                Created = now,
-                Modified = now,
+                Created = utcNow,
+                Modified = utcNow,
                 Size = fileSize
             }, memory);
 
@@ -231,7 +231,7 @@ public class RedisFileStorage : IFileStorage
     public async Task<int> DeleteFilesAsync(string? searchPattern = null, CancellationToken cancellationToken = default)
     {
         var files = await GetFileListAsync(searchPattern, cancellationToken: cancellationToken).AnyContext();
-        if (files.Count == 0)
+        if (files is { Count: 0 })
             return 0;
 
         var fields = files.Select(f => (RedisValue)f.Path).ToArray();

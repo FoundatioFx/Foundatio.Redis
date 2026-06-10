@@ -18,6 +18,7 @@ internal sealed class RedisCapabilities
     {
         ArgumentNullException.ThrowIfNull(muxer);
         ArgumentNullException.ThrowIfNull(logger);
+
         _muxer = muxer;
         _logger = logger;
     }
@@ -32,11 +33,11 @@ internal sealed class RedisCapabilities
     private bool CheckVersion(ref int cached, Version minVersion, string featureName)
     {
         int value = Volatile.Read(ref cached);
-        if (value != 0)
+        if (value is not 0)
             return value > 0;
 
         var endpoints = _muxer.GetEndPoints();
-        if (endpoints.Length == 0)
+        if (endpoints is { Length: 0 })
         {
             _logger.LogDebug("{Feature}: No endpoints configured, feature not available", featureName);
             return false;
