@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Foundatio.Caching;
 using Foundatio.Redis.Tests.Extensions;
@@ -608,4 +609,119 @@ public class ScopedRedisCacheClientResp3Tests : ScopedRedisCacheClientTests
 {
     public ScopedRedisCacheClientResp3Tests(ITestOutputHelper output) : base(output) { }
     protected override RedisProtocol? Protocol => RedisProtocol.Resp3;
+
+    [Fact]
+    public override async Task ListAddAsync_WithExpiration_SetsExpirationCorrectly()
+    {
+        var cache = GetCacheClient();
+        if (cache is null)
+            return;
+
+        using (cache)
+        {
+            await cache.RemoveAllAsync();
+
+            // Past expiration on new key
+            long result = await cache.ListAddAsync("list-past-exp-new", [1], TimeSpan.FromMilliseconds(-1));
+            Assert.Equal(0, result);
+            Assert.False(await cache.ExistsAsync("list-past-exp-new"));
+            Assert.False((await cache.GetListAsync<int>("list-past-exp-new")).HasValue);
+
+            // Past expiration on existing key: only removes the values being added
+            Assert.Equal(1, await cache.ListAddAsync("list-past-exp-existing", [1]));
+            Assert.True(await cache.ExistsAsync("list-past-exp-existing"));
+            result = await cache.ListAddAsync("list-past-exp-existing", [2], TimeSpan.FromSeconds(-1));
+            Assert.Equal(0, result);
+            Assert.True(await cache.ExistsAsync("list-past-exp-existing"));
+            var existingList = await cache.GetListAsync<int>("list-past-exp-existing");
+            Assert.True(existingList.HasValue);
+            Assert.Single(existingList.Value);
+            Assert.Contains(1, existingList.Value);
+
+            // Past expiration on existing key with multiple items
+            Assert.Equal(1, await cache.ListAddAsync("list-past-exp-multi", [1]));
+            Assert.Equal(1, await cache.ListAddAsync("list-past-exp-multi", [2]));
+            Assert.Equal(2, (await cache.GetListAsync<int>("list-past-exp-multi")).Value.Count);
+            result = await cache.ListAddAsync("list-past-exp-multi", [3], TimeSpan.FromSeconds(-1));
+            Assert.Equal(0, result);
+            Assert.True(await cache.ExistsAsync("list-past-exp-multi"));
+            var multiList = await cache.GetListAsync<int>("list-past-exp-multi");
+            Assert.Equal(2, multiList.Value.Count);
+            Assert.Contains(1, multiList.Value);
+            Assert.Contains(2, multiList.Value);
+
+            // Past expiration removes existing item if it matches
+            Assert.Equal(1, await cache.ListAddAsync("list-past-exp-remove", [1]));
+            Assert.Equal(1, await cache.ListAddAsync("list-past-exp-remove", [2]));
+            result = await cache.ListAddAsync("list-past-exp-remove", [1], TimeSpan.FromSeconds(-1));
+            Assert.Equal(0, result);
+            Assert.True(await cache.ExistsAsync("list-past-exp-remove"));
+            var removeList = await cache.GetListAsync<int>("list-past-exp-remove");
+            Assert.Single(removeList.Value);
+            Assert.Contains(2, removeList.Value);
+            Assert.DoesNotContain(1, removeList.Value);
+
+            // Zero expiration: treated as expired
+            result = await cache.ListAddAsync("list-zero-exp", [1], TimeSpan.Zero);
+            Assert.Equal(0, result);
+            Assert.False(await cache.ExistsAsync("list-zero-exp"));
+            Assert.False((await cache.GetListAsync<int>("list-zero-exp")).HasValue);
+
+            // Max expiration: no expiration
+            result = await cache.ListAddAsync("list-max-exp", [1, 2, 3], TimeSpan.MaxValue);
+            Assert.Equal(3, result);
+            Assert.True(await cache.ExistsAsync("list-max-exp"));
+            var listValue = await cache.GetListAsync<int>("list-max-exp");
+            Assert.True(listValue.HasValue);
+            Assert.Equal(3, listValue.Value.Count);
+            var expiration = await cache.GetExpirationAsync("list-max-exp");
+            Assert.Null(expiration);
+
+            // Normal expiration
+            result = await cache.ListAddAsync("list-normal-exp", [1, 2, 3], TimeSpan.FromHours(1));
+            Assert.Equal(3, result);
+            Assert.True(await cache.ExistsAsync("list-normal-exp"));
+            listValue = await cache.GetListAsync<int>("list-normal-exp");
+            Assert.True(listValue.HasValue);
+            Assert.Equal(3, listValue.Value.Count);
+            expiration = await cache.GetExpirationAsync("list-normal-exp");
+            Assert.NotNull(expiration);
+            Assert.InRange(expiration.Value, TimeSpan.FromMinutes(59), TimeSpan.FromHours(1));
+
+            // Staggered expiration with wider margins to avoid CI timing flakes
+            const string key = "list:staggered-expiration";
+            Assert.Equal(1, await cache.ListAddAsync(key, [2], TimeSpan.FromMilliseconds(250)));
+            Assert.Equal(1, await cache.ListAddAsync(key, [3], TimeSpan.FromSeconds(5)));
+
+            var cacheValue = await cache.GetListAsync<int>(key);
+            Assert.True(cacheValue.HasValue);
+            Assert.Equal(2, cacheValue.Value.Count);
+
+            await Task.Delay(500, TestCancellationToken);
+            cacheValue = await cache.GetListAsync<int>(key);
+            Assert.True(cacheValue.HasValue);
+            Assert.Single(cacheValue.Value);
+            Assert.Contains(3, cacheValue.Value);
+            Assert.DoesNotContain(2, cacheValue.Value);
+
+            await Task.Delay(TimeSpan.FromSeconds(5), TestCancellationToken);
+            Assert.False(await cache.ExistsAsync(key));
+
+            // Null expiration: removes expiration
+            result = await cache.ListAddAsync("list-null-exp", [1, 2], TimeSpan.FromHours(1));
+            Assert.Equal(2, result);
+            Assert.True(await cache.ExistsAsync("list-null-exp"));
+            expiration = await cache.GetExpirationAsync("list-null-exp");
+            Assert.NotNull(expiration);
+
+            result = await cache.ListAddAsync("list-null-exp", [3]);
+            Assert.Equal(1, result);
+            Assert.True(await cache.ExistsAsync("list-null-exp"));
+            listValue = await cache.GetListAsync<int>("list-null-exp");
+            Assert.True(listValue.HasValue);
+            Assert.Equal(3, listValue.Value.Count);
+            expiration = await cache.GetExpirationAsync("list-null-exp");
+            Assert.Null(expiration);
+        }
+    }
 }
