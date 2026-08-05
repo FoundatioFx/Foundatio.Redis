@@ -74,9 +74,16 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
 
+        var expectedValue = expected.ToRedisValue(_options.Serializer);
+
+        // Redis 8.4+ supports DELEX ... IFEQ natively via the ValueCondition API, which is an exact semantic
+        // match for this Lua script (delete only if the current value equals expected). Not available on
+        // Valkey or other forks; SupportsCas guards for that.
+        if (_capabilities.SupportsCas)
+            return await Database.StringDeleteAsync(key, ValueCondition.Equal(expectedValue)).AnyContext();
+
         await LoadScriptsAsync().AnyContext();
 
-        var expectedValue = expected.ToRedisValue(_options.Serializer);
         var redisResult = await Database.ScriptEvaluateAsync(GetScript(_removeIfEqual), new { key = (RedisKey)key, expected = expectedValue }).AnyContext();
         int result = (int)redisResult;
 
@@ -683,6 +690,10 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             return false;
         }
 
+        // NOTE: Intentionally kept on the Lua path even though Redis 8.4+ supports SET ... IFEQ natively.
+        // This script also replaces when the key is absent (currentVal == false), which native IFEQ does not
+        // allow - IFEQ only matches true value equality. Converting would change replace-or-create semantics
+        // that lock-renewal-style callers may depend on, without adequate existing test coverage to verify it.
         await LoadScriptsAsync().AnyContext();
 
         var redisValue = value.ToRedisValue(_options.Serializer);

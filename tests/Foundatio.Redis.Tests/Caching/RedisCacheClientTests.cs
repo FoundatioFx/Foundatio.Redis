@@ -12,15 +12,13 @@ namespace Foundatio.Redis.Tests.Caching;
 
 public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
 {
-    protected virtual RedisProtocol? Protocol => null;
-
     public RedisCacheClientTests(ITestOutputHelper output) : base(output)
     {
     }
 
     protected override ICacheClient? GetCacheClient(bool shouldThrowOnSerializationError = true)
     {
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log);
         if (muxer is null)
             return null;
 
@@ -676,7 +674,7 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     [Fact]
     public async Task GetListAsync_WithExistingFormat_UpgradeListType()
     {
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log);
         if (muxer is null)
             return;
 
@@ -726,7 +724,7 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     {
         await base.InitializeAsync();
         _logger.LogDebug("Initializing");
-        var muxer = SharedConnection.GetMuxer(Log, Protocol);
+        var muxer = SharedConnection.GetMuxer(Log);
         if (muxer is null)
             return;
 
@@ -738,10 +736,4 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
         await base.DisposeAsync();
         _logger.LogDebug("Disposing");
     }
-}
-
-public class RedisCacheClientResp3Tests : RedisCacheClientTests
-{
-    public RedisCacheClientResp3Tests(ITestOutputHelper output) : base(output) { }
-    protected override RedisProtocol? Protocol => RedisProtocol.Resp3;
 }

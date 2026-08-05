@@ -1,5 +1,7 @@
-﻿-- NOTE: When Redis 8.4+ becomes the minimum supported version, this script can be replaced
--- with native CAS/CAD: SET @key @value IFEQ @expected [PX @expires] (SE.Redis 2.10.1+ supports this via ValueCondition).
+﻿-- NOTE: This script is intentionally permanent, not a version-gated fallback. It replaces the value when the
+-- key is absent (currentVal == false) as well as when it matches @expected. Native Redis 8.4+ SET ... IFEQ
+-- has no "or absent" allowance - it only matches true value equality - so switching to it would change
+-- replace-or-create semantics that lock-renewal-style callers may depend on.
 local currentVal = redis.call('get', @key)
 if (currentVal == false or currentVal == @expected) then
   if (@expires ~= nil and @expires ~= '') then
