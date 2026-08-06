@@ -1,9 +1,9 @@
-﻿-- NOTE: This script is intentionally permanent, not a version-gated fallback. It replaces the value when the
--- key is absent (currentVal == false) as well as when it matches @expected. Native Redis 8.4+ SET ... IFEQ
--- has no "or absent" allowance - it only matches true value equality - so switching to it would change
--- replace-or-create semantics that lock-renewal-style callers may depend on.
+﻿-- Fallback for pre-8.4 Redis and pre-8.1 Valkey (SET ... IFEQ), and other forks, where native compare-and-swap
+-- via ValueCondition is unavailable. See RedisCapabilities.SupportsCompareAndSwap.
+-- Only replaces when the current value matches @expected; an absent key does not match (mirrors ICacheClient's
+-- documented contract and InMemoryCacheClient, which also returns false rather than creating the key).
 local currentVal = redis.call('get', @key)
-if (currentVal == false or currentVal == @expected) then
+if (currentVal == @expected) then
   if (@expires ~= nil and @expires ~= '') then
     return redis.call('set', @key, @value, 'PX', @expires) and 1 or 0
   else

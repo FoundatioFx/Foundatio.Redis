@@ -76,10 +76,9 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         var expectedValue = expected.ToRedisValue(_options.Serializer);
 
-        // Redis 8.4+ supports DELEX ... IFEQ natively via the ValueCondition API, which is an exact semantic
-        // match for this Lua script (delete only if the current value equals expected). Not available on
-        // Valkey or other forks; SupportsCas guards for that.
-        if (_capabilities.SupportsCas)
+        // DELEX ... IFEQ (via ValueCondition) is an exact semantic match for this Lua script - delete only if
+        // the current value equals expected. See RedisCapabilities.SupportsCompareAndDelete for availability.
+        if (_capabilities.SupportsCompareAndDelete)
             return await Database.StringDeleteAsync(key, ValueCondition.Equal(expectedValue)).AnyContext();
 
         await LoadScriptsAsync().AnyContext();
@@ -690,14 +689,19 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
             return false;
         }
 
-        // NOTE: Intentionally kept on the Lua path even though Redis 8.4+ supports SET ... IFEQ natively.
-        // This script also replaces when the key is absent (currentVal == false), which native IFEQ does not
-        // allow - IFEQ only matches true value equality. Converting would change replace-or-create semantics
-        // that lock-renewal-style callers may depend on, without adequate existing test coverage to verify it.
-        await LoadScriptsAsync().AnyContext();
-
         var redisValue = value.ToRedisValue(_options.Serializer);
         var expectedValue = expected.ToRedisValue(_options.Serializer);
+
+        // SET key value IFEQ expected (via ValueCondition) is an exact semantic match for this Lua script -
+        // replace only if the current value equals expected. See RedisCapabilities.SupportsCompareAndSwap.
+        if (_capabilities.SupportsCompareAndSwap)
+        {
+            var normalizedExpiry = NormalizeExpiration(expiresIn);
+            var expiration = normalizedExpiry.HasValue ? new Expiration(normalizedExpiry.Value) : Expiration.Default;
+            return await Database.StringSetAsync(key, redisValue, expiration, ValueCondition.Equal(expectedValue)).AnyContext();
+        }
+
+        await LoadScriptsAsync().AnyContext();
 
         var expiresMs = GetExpirationMilliseconds(expiresIn);
         var expiresArg = expiresMs.HasValue ? (RedisValue)expiresMs.Value : RedisValue.EmptyString;
