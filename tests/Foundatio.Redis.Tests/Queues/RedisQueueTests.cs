@@ -169,6 +169,12 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
     }
 
     [Fact]
+    public override Task EnqueueAsync_WithEmptyGroupId_EnqueuesWithoutGroupAsync()
+    {
+        return base.EnqueueAsync_WithEmptyGroupId_EnqueuesWithoutGroupAsync();
+    }
+
+    [Fact]
     public override Task EnqueueAsync_WithGroupId_RoundTripsGroupIdAsync()
     {
         return base.EnqueueAsync_WithGroupId_RoundTripsGroupIdAsync();
