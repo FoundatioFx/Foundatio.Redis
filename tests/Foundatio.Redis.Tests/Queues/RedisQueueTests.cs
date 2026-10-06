@@ -126,6 +126,12 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
         return base.AbandonAsync_WithGroupId_PreservesGroupIdOnRetryAsync();
     }
 
+    [Fact(Skip = "Redis requeues delayed retries in the minute-interval maintenance task")]
+    public override Task AbandonAsync_WithGroupIdAndRetryDelay_PreservesGroupIdOnRetryAsync()
+    {
+        return base.AbandonAsync_WithGroupIdAndRetryDelay_PreservesGroupIdOnRetryAsync();
+    }
+
     [Fact]
     public override Task DequeueAsync_WithDispose_AutoAbandonsEntryAsync()
     {
@@ -169,6 +175,12 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
     }
 
     [Fact]
+    public override Task EnqueueAsync_WhenEnqueuingHandlerClearsGroupId_EnqueuesWithoutGroupAsync()
+    {
+        return base.EnqueueAsync_WhenEnqueuingHandlerClearsGroupId_EnqueuesWithoutGroupAsync();
+    }
+
+    [Fact]
     public override Task EnqueueAsync_WithEmptyGroupId_EnqueuesWithoutGroupAsync()
     {
         return base.EnqueueAsync_WithEmptyGroupId_EnqueuesWithoutGroupAsync();
@@ -184,6 +196,12 @@ public class RedisQueueTests : QueueTestBase, IAsyncLifetime
     public override Task EnqueueAsync_WithSerializationError_ThrowsAndLeavesQueueEmptyAsync()
     {
         return base.EnqueueAsync_WithSerializationError_ThrowsAndLeavesQueueEmptyAsync();
+    }
+
+    [Fact]
+    public override Task EnqueueAsync_WithReusedOptions_DoesNotChangeCallerOptionsAsync()
+    {
+        return base.EnqueueAsync_WithReusedOptions_DoesNotChangeCallerOptionsAsync();
     }
 
     [Fact]
