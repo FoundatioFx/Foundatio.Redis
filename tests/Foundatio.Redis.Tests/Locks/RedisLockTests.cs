@@ -139,6 +139,73 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
         return base.LockWontTimeoutEarly();
     }
 
+    [Fact]
+    public override Task AcquireAsync_AfterPeriodExhausted_RecoversWithinNextPeriodAsync()
+    {
+        return base.AcquireAsync_AfterPeriodExhausted_RecoversWithinNextPeriodAsync();
+    }
+
+    [Fact]
+    public override Task AcquireAsync_MultiResource_ThrowsWhenAnyLockUnavailableAsync()
+    {
+        return base.AcquireAsync_MultiResource_ThrowsWhenAnyLockUnavailableAsync();
+    }
+
+    [Fact]
+    public override Task AcquireAsync_ThrowsWhenCancellationTokenCancelledAsync()
+    {
+        return base.AcquireAsync_ThrowsWhenCancellationTokenCancelledAsync();
+    }
+
+    [Fact]
+    public override Task AcquireAsync_ThrowsWhenLockNotAvailableAsync()
+    {
+        return base.AcquireAsync_ThrowsWhenLockNotAvailableAsync();
+    }
+
+    [Fact]
+    public override Task RenewAsync_AfterRelease_ThrowsLockExceptionAndDoesNotRecreateLock()
+    {
+        return base.RenewAsync_AfterRelease_ThrowsLockExceptionAndDoesNotRecreateLock();
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(4)]
+    public override Task RenewAsync_WithInvalidDuration_PreservesCurrentOwner(int milliseconds)
+    {
+        return base.RenewAsync_WithInvalidDuration_PreservesCurrentOwner(milliseconds);
+    }
+
+    [Fact]
+    public override Task RenewAsync_WithMissingLock_ThrowsLockException()
+    {
+        return base.RenewAsync_WithMissingLock_ThrowsLockException();
+    }
+
+    [Fact]
+    public override Task RenewAsync_WithMultipleResources_WhenOneLockReplaced_ThrowsLockExceptionAndPreservesCurrentOwner()
+    {
+        return base.RenewAsync_WithMultipleResources_WhenOneLockReplaced_ThrowsLockExceptionAndPreservesCurrentOwner();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public override Task RenewAsync_WithReplacedOwner_ThrowsLockExceptionAndPreservesCurrentOwner(bool scoped)
+    {
+        return base.RenewAsync_WithReplacedOwner_ThrowsLockExceptionAndPreservesCurrentOwner(scoped);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public override Task TryAcquireAsync_WithMultipleResources_WhenResourceNamesShareSuffix_ReleasesAcquiredLocksAndReturnsNull(bool scoped)
+    {
+        return base.TryAcquireAsync_WithMultipleResources_WhenResourceNamesShareSuffix_ReleasesAcquiredLocksAndReturnsNull(scoped);
+    }
+
     public void Dispose()
     {
         _cache.Dispose();
