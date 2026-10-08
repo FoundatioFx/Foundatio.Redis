@@ -27,7 +27,6 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
     private long _dequeuedCount;
     private long _completedCount;
     private long _abandonedCount;
-    private long _workerErrorCount;
     private long _workItemTimeoutCount;
     private readonly ILockProvider _maintenanceLockProvider;
     private Task? _maintenanceTask;
@@ -129,7 +128,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                 Dequeued = _dequeuedCount,
                 Completed = _completedCount,
                 Abandoned = _abandonedCount,
-                Errors = _workerErrorCount,
+                Errors = WorkerErrorCount,
                 Timeouts = _workItemTimeoutCount
             }, TaskContinuationOptions.OnlyOnRanToCompletion);
     }
@@ -252,70 +251,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
 
     protected override void StartWorkingImpl(Func<IQueueEntry<T>, CancellationToken, Task> handler, bool autoComplete, CancellationToken cancellationToken)
     {
-        if (handler == null)
-            throw new ArgumentNullException(nameof(handler));
-
-        _logger.LogTrace("Queue {QueueName} start working", _options.Name);
-
-        var linkedCancellationTokenSource = GetLinkedDisposableCancellationTokenSource(cancellationToken);
-        _workers.Add(Task.Run(async () =>
-        {
-            _logger.LogTrace("WorkerLoop Start {QueueName}", _options.Name);
-
-            while (!linkedCancellationTokenSource.IsCancellationRequested)
-            {
-                _logger.LogTrace("WorkerLoop Signaled {QueueName}", _options.Name);
-
-                IQueueEntry<T>? queueEntry = null;
-                try
-                {
-                    queueEntry = await DequeueImplAsync(linkedCancellationTokenSource.Token).AnyContext();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error on Dequeue: {Message}", ex.Message);
-                }
-
-                if (linkedCancellationTokenSource.IsCancellationRequested || queueEntry == null)
-                    continue;
-
-                try
-                {
-                    await handler(queueEntry, linkedCancellationTokenSource.Token).AnyContext();
-                }
-                catch (Exception ex)
-                {
-                    Interlocked.Increment(ref _workerErrorCount);
-                    _logger.LogError(ex, "Worker error: {Message}", ex.Message);
-
-                    if (!queueEntry.IsAbandoned && !queueEntry.IsCompleted)
-                    {
-                        try
-                        {
-                            await queueEntry.AbandonAsync().AnyContext();
-                        }
-                        catch (Exception abandonEx)
-                        {
-                            _logger.LogError(abandonEx, "Worker error abandoning queue entry: {Message}", abandonEx.Message);
-                        }
-                    }
-                }
-
-                if (autoComplete && !queueEntry.IsAbandoned && !queueEntry.IsCompleted)
-                {
-                    try
-                    {
-                        await _resiliencePolicy.ExecuteAsync(async _ => await queueEntry.CompleteAsync(), cancellationToken: linkedCancellationTokenSource.Token).AnyContext();
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Worker error attempting to auto complete entry: {Message}", ex.Message);
-                    }
-                }
-            }
-
-            _logger.LogTrace("Worker exiting: {QueueName} Cancel Requested: {IsCancellationRequested}", _options.Name, linkedCancellationTokenSource.IsCancellationRequested);
-        }, linkedCancellationTokenSource.Token).ContinueWith(_ => linkedCancellationTokenSource.Dispose()));
+        _workers.Add(StartWorker(handler, autoComplete, cancellationToken));
     }
 
     protected override async Task<IQueueEntry<T>?> DequeueImplAsync(CancellationToken linkedCancellationToken)
@@ -598,7 +534,7 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
         _dequeuedCount = 0;
         _completedCount = 0;
         _abandonedCount = 0;
-        _workerErrorCount = 0;
+        ResetWorkerErrorCount();
     }
 
     private async Task DeleteListAsync(string name)
