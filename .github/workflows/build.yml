@@ -3,7 +3,7 @@ on: [push, pull_request]
 
 jobs:
   build:
-    uses: FoundatioFx/Foundatio/.github/workflows/build-workflow.yml@main
+    uses: FoundatioFx/Foundatio/.github/workflows/build-workflow.yml@a28d0f736d9124431de09764c56aff77fbdc1d5d
     secrets: inherit
     with:
       new-test-runner: true
