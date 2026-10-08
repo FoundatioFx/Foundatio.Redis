@@ -28,7 +28,6 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
     private long _completedCount;
     private long _abandonedCount;
     private long _workerErrorCount;
-    private static readonly TimeSpan MinWorkerErrorDelay = TimeSpan.FromSeconds(1);
     private long _workItemTimeoutCount;
     private readonly ILockProvider _maintenanceLockProvider;
     private Task? _maintenanceTask;
@@ -272,16 +271,9 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
                 {
                     queueEntry = await DequeueImplAsync(linkedCancellationTokenSource.Token).AnyContext();
                 }
-                catch (OperationCanceledException) when (linkedCancellationTokenSource.IsCancellationRequested) { }
                 catch (Exception ex)
                 {
-                    Interlocked.Increment(ref _workerErrorCount);
                     _logger.LogError(ex, "Error on Dequeue: {Message}", ex.Message);
-                    try
-                    {
-                        await _timeProvider.Delay(MinWorkerErrorDelay, linkedCancellationTokenSource.Token).AnyContext();
-                    }
-                    catch (OperationCanceledException) { }
                 }
 
                 if (linkedCancellationTokenSource.IsCancellationRequested || queueEntry == null)
