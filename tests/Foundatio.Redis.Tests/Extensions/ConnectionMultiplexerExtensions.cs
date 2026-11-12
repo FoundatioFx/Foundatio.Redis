@@ -9,16 +9,21 @@ public static class ConnectionMultiplexerExtensions
 {
     public static async Task FlushAllAsync(this ConnectionMultiplexer muxer)
     {
-        try
+        const int maxAttempts = 5;
+        for (int attempt = 1; ; attempt++)
         {
-            await FlushPrimariesAsync(muxer);
-        }
-        catch (RedisException ex) when (IsReplicaError(ex))
-        {
-            // Cluster roles can change after the multiplexer cached them (for example while the cluster settles at startup).
-            // Refresh the topology so the current primaries are flushed instead of a node that became a replica.
-            await muxer.ConfigureAsync();
-            await FlushPrimariesAsync(muxer);
+            try
+            {
+                await FlushPrimariesAsync(muxer);
+                return;
+            }
+            catch (RedisException ex) when (IsReplicaError(ex) && attempt < maxAttempts)
+            {
+                // Cluster roles can change after the multiplexer cached them (for example while the cluster settles at startup).
+                // Refresh the topology so the current primaries are flushed instead of a node that became a replica.
+                await Task.Delay(TimeSpan.FromMilliseconds(250 * attempt));
+                await muxer.ConfigureAsync();
+            }
         }
     }
 
