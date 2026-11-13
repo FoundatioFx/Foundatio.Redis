@@ -170,6 +170,18 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
     }
 
     [Theory]
+    [InlineData(-1, false)]
+    [InlineData(1, false)]
+    [InlineData(4, false)]
+    [InlineData(-1, true)]
+    [InlineData(1, true)]
+    [InlineData(4, true)]
+    public override Task AcquireAsync_WithInvalidDuration_PreservesCurrentOwner(int milliseconds, bool tryAcquire)
+    {
+        return base.AcquireAsync_WithInvalidDuration_PreservesCurrentOwner(milliseconds, tryAcquire);
+    }
+
+    [Theory]
     [InlineData(-1)]
     [InlineData(0)]
     [InlineData(4)]
