@@ -1,8 +1,14 @@
 version: 2
+registries:
+  foundatio-feed:
+    type: nuget-feed
+    url: https://f.feedz.io/foundatio/foundatio/nuget/index.json
 updates:
 
 - package-ecosystem: nuget
   directory: "/"
+  registries:
+  - foundatio-feed
   schedule:
     interval: weekly
   cooldown:
