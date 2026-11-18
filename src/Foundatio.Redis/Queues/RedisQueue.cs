@@ -251,6 +251,8 @@ public class RedisQueue<T> : QueueBase<T, RedisQueueOptions<T>> where T : class
 
     protected override void StartWorkingImpl(Func<IQueueEntry<T>, CancellationToken, Task> handler, bool autoComplete, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(handler);
+
         _workers.Add(StartWorker(handler, autoComplete, cancellationToken));
     }
 
