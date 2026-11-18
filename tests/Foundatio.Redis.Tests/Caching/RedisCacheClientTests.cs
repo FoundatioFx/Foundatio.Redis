@@ -248,6 +248,48 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     }
 
     [Fact]
+    public override Task AddAsync_WithConcurrentAcquireAndRelease_OnlyOneOwnerAtATime()
+    {
+        return base.AddAsync_WithConcurrentAcquireAndRelease_OnlyOneOwnerAtATime();
+    }
+
+    [Fact]
+    public override Task IncrementAsync_WithConcurrentRequests_DoesNotLoseUpdates()
+    {
+        return base.IncrementAsync_WithConcurrentRequests_DoesNotLoseUpdates();
+    }
+
+    [Fact]
+    public override Task ListAddAsync_WithConcurrentRequests_DoesNotLoseValues()
+    {
+        return base.ListAddAsync_WithConcurrentRequests_DoesNotLoseValues();
+    }
+
+    [Fact]
+    public override Task SetIfHigherAsync_WithConcurrentRequests_DifferencesSumToMaximum()
+    {
+        return base.SetIfHigherAsync_WithConcurrentRequests_DifferencesSumToMaximum();
+    }
+
+    [Fact]
+    public override Task SetIfHigherAsync_WithLowerOrEqualValue_LeavesValueAndExpirationUnchanged()
+    {
+        return base.SetIfHigherAsync_WithLowerOrEqualValue_LeavesValueAndExpirationUnchanged();
+    }
+
+    [Fact]
+    public override Task SetIfLowerAsync_WithConcurrentRequests_DifferencesSumToDecrease()
+    {
+        return base.SetIfLowerAsync_WithConcurrentRequests_DifferencesSumToDecrease();
+    }
+
+    [Fact]
+    public override Task SetIfLowerAsync_WithHigherOrEqualValue_LeavesValueAndExpirationUnchanged()
+    {
+        return base.SetIfLowerAsync_WithHigherOrEqualValue_LeavesValueAndExpirationUnchanged();
+    }
+
+    [Fact]
     public override Task ListAddAsync_WithExpiration_SetsExpirationCorrectly()
     {
         return base.ListAddAsync_WithExpiration_SetsExpirationCorrectly();
