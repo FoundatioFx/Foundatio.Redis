@@ -3,6 +3,10 @@ on: [push, pull_request]
 
 jobs:
   build:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     uses: FoundatioFx/Foundatio/.github/workflows/build-workflow.yml@main
     secrets: inherit
     with:
