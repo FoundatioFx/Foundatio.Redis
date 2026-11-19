@@ -1,5 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <OutputType>Exe</OutputType>
     <IsTestProject>false</IsTestProject>
     <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>

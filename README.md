@@ -125,6 +125,17 @@ Contributions are welcome! Please feel free to submit a Pull Request. See our [d
 3. Run `dotnet build` to build
 4. Run `dotnet test` to run tests
 
+### Redis benchmarks
+
+Run the lock, queue-job, and hybrid list benchmarks against a dedicated Redis instance or cluster. The new fixtures use separate keys, queue names, and pub/sub channels for each run.
+
+```bash
+export ConnectionStrings__RedisConnectionString='localhost:6379,allowAdmin=true'
+dotnet run -c Release -f net10.0 --project tests/Foundatio.Benchmarks -p:ReferenceFoundatioSource=false -- --filter '*RedisLeaseBenchmarks*' '*RedisHybridListBenchmarks*'
+```
+
+Set `ReferenceFoundatioSource=true` in the environment to benchmark a sibling `Foundatio` checkout and omit the command's `-p:ReferenceFoundatioSource=false` override. The cold-list case adds to 64 absent keys per invocation and reports time per key. Cleanup runs outside the measurement. The warm case adds and removes one member while preserving the seeded list.
+
 ## 📄 License
 
 Apache 2.0 License
