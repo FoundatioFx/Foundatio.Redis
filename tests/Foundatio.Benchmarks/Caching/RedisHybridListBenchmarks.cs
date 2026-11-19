@@ -12,7 +12,7 @@ public class RedisHybridListBenchmarks
 {
     private const int BatchSize = 64;
     private readonly int[] _member = [1];
-    private readonly string _prefix = $"{{foundatio-bench-{Guid.NewGuid():N}}}";
+    private readonly string _prefix = $"{{{RedisBenchmarkEnvironment.CreatePrefix()}}}";
     private ConnectionMultiplexer _connection = null!;
     private RedisHybridCacheClient _cache = null!;
     private string[] _coldKeys = null!;
@@ -21,7 +21,7 @@ public class RedisHybridListBenchmarks
     [GlobalSetup]
     public async Task SetupAsync()
     {
-        _connection = await RedisBenchmarkConnection.ConnectAsync();
+        _connection = await RedisBenchmarkEnvironment.ConnectAsync();
         _cache = new RedisHybridCacheClient(o => o.ConnectionMultiplexer(_connection).RedisChannelName(_prefix));
         _coldKeys = Enumerable.Range(0, BatchSize).Select(i => $"{_prefix}:cold:{i}").ToArray();
         _warmKey = $"{_prefix}:warm";

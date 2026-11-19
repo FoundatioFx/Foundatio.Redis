@@ -134,7 +134,7 @@ export ConnectionStrings__RedisConnectionString='localhost:6379,allowAdmin=true'
 dotnet run -c Release -f net10.0 --project tests/Foundatio.Benchmarks -p:ReferenceFoundatioSource=false -- --filter '*RedisLeaseBenchmarks*' '*RedisHybridListBenchmarks*'
 ```
 
-Set `ReferenceFoundatioSource=true` in the environment to benchmark a sibling `Foundatio` checkout and omit the command's `-p:ReferenceFoundatioSource=false` override. The cold-list case adds to 64 absent keys per invocation and reports time per key. Cleanup runs outside the measurement. The warm case adds and removes one member while preserving the seeded list.
+For sequential comparisons, reuse a dedicated `FOUNDATIO_BENCHMARK_PREFIX` across revisions to place the same keys on the same cluster nodes. The cold-list case adds to 64 absent keys per invocation and reports time per key. Cleanup runs outside the measurement. The warm case adds and removes one member while preserving the seeded list.
 
 ## 📄 License
 

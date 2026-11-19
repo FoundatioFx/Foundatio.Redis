@@ -15,7 +15,7 @@ namespace Foundatio.Benchmarks.Locks;
 [MemoryDiagnoser]
 public class RedisLeaseBenchmarks
 {
-    private readonly string _prefix = $"foundatio-bench-{Guid.NewGuid():N}";
+    private readonly string _prefix = RedisBenchmarkEnvironment.CreatePrefix();
     private ConnectionMultiplexer _connection = null!;
     private RedisCacheClient _cache = null!;
     private RedisMessageBus _bus = null!;
@@ -30,7 +30,7 @@ public class RedisLeaseBenchmarks
     [GlobalSetup]
     public async Task SetupAsync()
     {
-        _connection = await RedisBenchmarkConnection.ConnectAsync();
+        _connection = await RedisBenchmarkEnvironment.ConnectAsync();
         _cache = new RedisCacheClient(o => o.ConnectionMultiplexer(_connection));
         _bus = new RedisMessageBus(o => o.Subscriber(_connection.GetSubscriber()).Topic(_prefix));
         _locks = new CacheLockProvider(_cache, _bus);
