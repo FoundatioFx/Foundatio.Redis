@@ -578,15 +578,15 @@ public class ScopedRedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     }
 
     [Fact]
-    public override Task SetIfLowerAsync_WithConcurrentRequests_DifferencesSumToDecrease()
+    public override Task SetIfHigherAsync_WithLowerOrEqualValue_LeavesValueAndExpirationUnchanged()
     {
-        return base.SetIfLowerAsync_WithConcurrentRequests_DifferencesSumToDecrease();
+        return base.SetIfHigherAsync_WithLowerOrEqualValue_LeavesValueAndExpirationUnchanged();
     }
 
     [Fact]
-    public override Task SetIfHigherAsync_WithLowerValue_ReturnsZeroAndKeepsValue()
+    public override Task SetIfLowerAsync_WithConcurrentRequests_DifferencesSumToDecrease()
     {
-        return base.SetIfHigherAsync_WithLowerValue_ReturnsZeroAndKeepsValue();
+        return base.SetIfLowerAsync_WithConcurrentRequests_DifferencesSumToDecrease();
     }
 
     [Fact]

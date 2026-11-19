@@ -50,6 +50,42 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
     }
 
     [Fact]
+    public override Task AcquireAsync_AfterPeriodExhausted_RecoversWithinNextPeriodAsync()
+    {
+        return base.AcquireAsync_AfterPeriodExhausted_RecoversWithinNextPeriodAsync();
+    }
+
+    [Fact]
+    public override Task AcquireAsync_MultiResource_ThrowsWhenAnyLockUnavailableAsync()
+    {
+        return base.AcquireAsync_MultiResource_ThrowsWhenAnyLockUnavailableAsync();
+    }
+
+    [Fact]
+    public override Task AcquireAsync_ThrowsWhenCancellationTokenCancelledAsync()
+    {
+        return base.AcquireAsync_ThrowsWhenCancellationTokenCancelledAsync();
+    }
+
+    [Fact]
+    public override Task AcquireAsync_ThrowsWhenLockNotAvailableAsync()
+    {
+        return base.AcquireAsync_ThrowsWhenLockNotAvailableAsync();
+    }
+
+    [Theory]
+    [InlineData(-1, false)]
+    [InlineData(1, false)]
+    [InlineData(4, false)]
+    [InlineData(-1, true)]
+    [InlineData(1, true)]
+    [InlineData(4, true)]
+    public override Task AcquireAsync_WithInvalidDuration_PreservesCurrentOwner(int milliseconds, bool tryAcquire)
+    {
+        return base.AcquireAsync_WithInvalidDuration_PreservesCurrentOwner(milliseconds, tryAcquire);
+    }
+
+    [Fact]
     public override Task AcquireAsync_WithReleaseOnDisposeFalse_DoesNotReleaseOnDispose()
     {
         return base.AcquireAsync_WithReleaseOnDisposeFalse_DoesNotReleaseOnDispose();
@@ -128,57 +164,9 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
     }
 
     [Fact]
-    public override Task TryUsingAsync_WithSuccessfulAction_ExecutesAndReleasesLock()
-    {
-        return base.TryUsingAsync_WithSuccessfulAction_ExecutesAndReleasesLock();
-    }
-
-    [Fact]
-    public override Task LockWontTimeoutEarly()
-    {
-        return base.LockWontTimeoutEarly();
-    }
-
-    [Fact]
-    public override Task AcquireAsync_AfterPeriodExhausted_RecoversWithinNextPeriodAsync()
-    {
-        return base.AcquireAsync_AfterPeriodExhausted_RecoversWithinNextPeriodAsync();
-    }
-
-    [Fact]
-    public override Task AcquireAsync_MultiResource_ThrowsWhenAnyLockUnavailableAsync()
-    {
-        return base.AcquireAsync_MultiResource_ThrowsWhenAnyLockUnavailableAsync();
-    }
-
-    [Fact]
-    public override Task AcquireAsync_ThrowsWhenCancellationTokenCancelledAsync()
-    {
-        return base.AcquireAsync_ThrowsWhenCancellationTokenCancelledAsync();
-    }
-
-    [Fact]
-    public override Task AcquireAsync_ThrowsWhenLockNotAvailableAsync()
-    {
-        return base.AcquireAsync_ThrowsWhenLockNotAvailableAsync();
-    }
-
-    [Fact]
     public override Task RenewAsync_AfterRelease_ThrowsLockExceptionAndDoesNotRecreateLock()
     {
         return base.RenewAsync_AfterRelease_ThrowsLockExceptionAndDoesNotRecreateLock();
-    }
-
-    [Theory]
-    [InlineData(-1, false)]
-    [InlineData(1, false)]
-    [InlineData(4, false)]
-    [InlineData(-1, true)]
-    [InlineData(1, true)]
-    [InlineData(4, true)]
-    public override Task AcquireAsync_WithInvalidDuration_PreservesCurrentOwner(int milliseconds, bool tryAcquire)
-    {
-        return base.AcquireAsync_WithInvalidDuration_PreservesCurrentOwner(milliseconds, tryAcquire);
     }
 
     [Theory]
@@ -196,12 +184,6 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
         return base.RenewAsync_WithMissingLock_ThrowsLockException();
     }
 
-    [Fact]
-    public override Task RenewAsync_WithMultipleResources_WhenOneLockReplaced_ThrowsLockExceptionAndPreservesCurrentOwner()
-    {
-        return base.RenewAsync_WithMultipleResources_WhenOneLockReplaced_ThrowsLockExceptionAndPreservesCurrentOwner();
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -210,12 +192,16 @@ public class RedisLockTests : LockTestBase, IDisposable, IAsyncLifetime
         return base.RenewAsync_WithReplacedOwner_ThrowsLockExceptionAndPreservesCurrentOwner(scoped);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public override Task TryAcquireAsync_WithMultipleResources_WhenResourceNamesShareSuffix_ReleasesAcquiredLocksAndReturnsNull(bool scoped)
+    [Fact]
+    public override Task TryUsingAsync_WithSuccessfulAction_ExecutesAndReleasesLock()
     {
-        return base.TryAcquireAsync_WithMultipleResources_WhenResourceNamesShareSuffix_ReleasesAcquiredLocksAndReturnsNull(scoped);
+        return base.TryUsingAsync_WithSuccessfulAction_ExecutesAndReleasesLock();
+    }
+
+    [Fact]
+    public override Task LockWontTimeoutEarly()
+    {
+        return base.LockWontTimeoutEarly();
     }
 
     public void Dispose()
