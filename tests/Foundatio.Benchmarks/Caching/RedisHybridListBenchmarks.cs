@@ -15,16 +15,20 @@ public class RedisHybridListBenchmarks
     private readonly string _prefix = $"{{{RedisBenchmarkEnvironment.CreatePrefix()}}}";
     private ConnectionMultiplexer _connection = null!;
     private RedisHybridCacheClient _cache = null!;
-    private string[] _coldKeys = null!;
-    private string _warmKey = null!;
+    private readonly string[] _coldKeys;
+    private readonly string _warmKey;
+
+    public RedisHybridListBenchmarks()
+    {
+        _coldKeys = Enumerable.Range(0, BatchSize).Select(i => $"{_prefix}:cold:{i}").ToArray();
+        _warmKey = $"{_prefix}:warm";
+    }
 
     [GlobalSetup]
     public async Task SetupAsync()
     {
         _connection = await RedisBenchmarkEnvironment.ConnectAsync();
         _cache = new RedisHybridCacheClient(o => o.ConnectionMultiplexer(_connection).RedisChannelName(_prefix));
-        _coldKeys = Enumerable.Range(0, BatchSize).Select(i => $"{_prefix}:cold:{i}").ToArray();
-        _warmKey = $"{_prefix}:warm";
         await _cache.ListAddAsync(_warmKey, new[] { 0 });
     }
 
@@ -40,7 +44,7 @@ public class RedisHybridListBenchmarks
     }
 
     [IterationCleanup(Target = nameof(AddToNewListAsync))]
-    public Task RemoveColdListsAsync() => _cache.RemoveAllAsync(_coldKeys);
+    public void RemoveColdLists() => _cache.RemoveAllAsync(_coldKeys).GetAwaiter().GetResult();
 
     [Benchmark]
     public async Task AddAndRemoveWarmMemberAsync()
