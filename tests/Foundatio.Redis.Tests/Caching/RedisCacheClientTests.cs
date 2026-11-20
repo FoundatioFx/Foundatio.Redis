@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Foundatio.Caching;
 using Foundatio.Redis.Tests.Extensions;
 using Foundatio.Tests.Caching;
+using Foundatio.Tests.Utility;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+using StackExchange.Redis.Profiling;
 using Xunit;
 
 namespace Foundatio.Redis.Tests.Caching;
@@ -119,6 +122,42 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
     public override Task GetAllExpirationAsync_WithMixedKeys_ReturnsExpectedResults()
     {
         return base.GetAllExpirationAsync_WithMixedKeys_ReturnsExpectedResults();
+    }
+
+    [Fact]
+    public async Task GetAllExpirationAsync_WithOneKeyAndScriptingDisabled_ReturnsEachExpirationState()
+    {
+        // Arrange
+        string? connectionString = Configuration.GetConnectionString("RedisConnectionString");
+        if (String.IsNullOrEmpty(connectionString))
+            return;
+
+        var options = ConfigurationOptions.Parse(connectionString);
+        options.CommandMap = CommandMap.Create(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "EVAL", "EVALSHA", "SCRIPT", "EXISTS" }, available: false);
+        using var connection = await ConnectionMultiplexer.ConnectAsync(options);
+        using var cache = new RedisCacheClient(o => o.ConnectionMultiplexer(connection).LoggerFactory(Log));
+        bool hasReplica = connection.GetServers().Any(s => s.IsReplica);
+        using ICacheClient reader = new RedisCacheClient(o => o.ConnectionMultiplexer(connection).LoggerFactory(Log).ReadMode(hasReplica ? CommandFlags.DemandReplica : CommandFlags.DemandMaster));
+        const string key = "expiration:single";
+        var ttl = TimeSpan.FromMinutes(5);
+        var profile = new ProfilingSession();
+        connection.RegisterProfiler(() => profile);
+
+        // Act
+        var missing = await reader.GetExpirationInfoAsync(key);
+        var metadataCommands = profile.FinishProfiling();
+        await cache.SetAsync(key, 1);
+        var persistent = await cache.GetAllExpirationAsync([key]);
+        await cache.SetExpirationAsync(key, ttl);
+        var expiring = await cache.GetAllExpirationAsync([key]);
+
+        // Assert
+        Assert.False(missing.HasValue);
+        var command = Assert.Single(metadataCommands);
+        Assert.Equal("PTTL", command.Command);
+        Assert.Equal(hasReplica, connection.GetServer(command.EndPoint).IsReplica);
+        Assert.Null(persistent[key]);
+        Assert.InRange(Assert.IsType<TimeSpan>(expiring[key]), TimeSpan.Zero, ttl);
     }
 
     [Fact]
