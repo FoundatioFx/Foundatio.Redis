@@ -797,6 +797,7 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         if (keyList.Count == 1)
         {
             var key = keyList[0];
+            // GetExpirationAsync maps both a missing key (-2) and a persistent key (-1) to null.
             long ttl = (long)await Database.ExecuteAsync("PTTL", [key], _options.ReadMode).AnyContext();
             if (ttl == -2)
                 return ReadOnlyDictionary<string, TimeSpan?>.Empty;

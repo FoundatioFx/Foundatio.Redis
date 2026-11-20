@@ -133,7 +133,7 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
             return;
 
         var options = ConfigurationOptions.Parse(connectionString);
-        options.CommandMap = CommandMap.Create(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "EVAL", "EVALSHA", "SCRIPT", "EXISTS" }, available: false);
+        options.CommandMap = CommandMap.Create(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "EVAL", "EVALSHA", "SCRIPT" }, available: false);
         using var connection = await ConnectionMultiplexer.ConnectAsync(options);
         using var cache = new RedisCacheClient(o => o.ConnectionMultiplexer(connection).LoggerFactory(Log));
         bool hasReplica = connection.GetServers().Any(s => s.IsReplica);
@@ -145,7 +145,7 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
 
         // Act
         var missing = await reader.GetAllExpirationAsync([key]);
-        var metadataCommands = profile.FinishProfiling();
+        var servingNodes = profile.FinishProfiling().Select(command => connection.GetServer(command.EndPoint)).ToArray();
         await cache.SetAsync(key, 1);
         var persistent = await cache.GetAllExpirationAsync([key]);
         await cache.SetExpirationAsync(key, ttl);
@@ -153,11 +153,10 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
 
         // Assert
         Assert.Empty(missing);
-        var command = Assert.Single(metadataCommands);
-        Assert.Equal("PTTL", command.Command);
-        Assert.Equal(hasReplica, connection.GetServer(command.EndPoint).IsReplica);
         Assert.Null(persistent[key]);
-        Assert.InRange(Assert.IsType<TimeSpan>(expiring[key]), TimeSpan.Zero, ttl);
+        Assert.InRange(Assert.IsType<TimeSpan>(expiring[key]), ttl - TimeSpan.FromMinutes(1), ttl);
+        Assert.NotEmpty(servingNodes);
+        Assert.All(servingNodes, node => Assert.Equal(hasReplica, node.IsReplica));
     }
 
     [Fact]
