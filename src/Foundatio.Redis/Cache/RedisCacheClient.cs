@@ -794,6 +794,17 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         if (keyList.Count is 0)
             return ReadOnlyDictionary<string, TimeSpan?>.Empty;
 
+        if (keyList.Count == 1)
+        {
+            var key = keyList[0];
+            // GetExpirationAsync maps both a missing key (-2) and a persistent key (-1) to null.
+            long ttl = (long)await Database.ExecuteAsync("PTTL", [key], _options.ReadMode).AnyContext();
+            if (ttl == -2)
+                return ReadOnlyDictionary<string, TimeSpan?>.Empty;
+
+            return new Dictionary<string, TimeSpan?>(1) { [key.ToString()] = ttl == -1 ? null : TimeSpan.FromMilliseconds(ttl) }.AsReadOnly();
+        }
+
         await LoadScriptsAsync().AnyContext();
 
         if (_isCluster)
