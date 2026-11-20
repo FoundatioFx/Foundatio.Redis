@@ -144,7 +144,7 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
         connection.RegisterProfiler(() => profile);
 
         // Act
-        var missing = await reader.GetExpirationInfoAsync(key);
+        var missing = await reader.GetAllExpirationAsync([key]);
         var metadataCommands = profile.FinishProfiling();
         await cache.SetAsync(key, 1);
         var persistent = await cache.GetAllExpirationAsync([key]);
@@ -152,7 +152,7 @@ public class RedisCacheClientTests : CacheClientTestsBase, IAsyncLifetime
         var expiring = await cache.GetAllExpirationAsync([key]);
 
         // Assert
-        Assert.False(missing.HasValue);
+        Assert.Empty(missing);
         var command = Assert.Single(metadataCommands);
         Assert.Equal("PTTL", command.Command);
         Assert.Equal(hasReplica, connection.GetServer(command.EndPoint).IsReplica);

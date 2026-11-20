@@ -766,20 +766,6 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
         return Database.KeyTimeToLiveAsync(key, _options.ReadMode);
     }
 
-    /// <summary>Gets the remaining TTL, distinguishing a persistent key from a missing key.</summary>
-    public async Task<CacheValue<TimeSpan?>> GetExpirationInfoAsync(string key)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(key);
-
-        long ttl = (long)await Database.ExecuteAsync("PTTL", [(RedisKey)key], _options.ReadMode).AnyContext();
-        return ttl switch
-        {
-            -2 => CacheValue<TimeSpan?>.NoValue,
-            -1 => CacheValue<TimeSpan?>.Null,
-            _ => new CacheValue<TimeSpan?>(TimeSpan.FromMilliseconds(ttl), true)
-        };
-    }
-
     public Task SetExpirationAsync(string key, TimeSpan expiresIn)
     {
         ArgumentException.ThrowIfNullOrEmpty(key);
@@ -810,11 +796,12 @@ public sealed class RedisCacheClient : ICacheClient, IHaveSerializer
 
         if (keyList.Count == 1)
         {
-            string key = keyList[0].ToString();
-            var expiration = await GetExpirationInfoAsync(key).AnyContext();
-            return expiration.HasValue
-                ? new Dictionary<string, TimeSpan?>(1) { [key] = expiration.Value }.AsReadOnly()
-                : ReadOnlyDictionary<string, TimeSpan?>.Empty;
+            var key = keyList[0];
+            long ttl = (long)await Database.ExecuteAsync("PTTL", [key], _options.ReadMode).AnyContext();
+            if (ttl == -2)
+                return ReadOnlyDictionary<string, TimeSpan?>.Empty;
+
+            return new Dictionary<string, TimeSpan?>(1) { [key.ToString()] = ttl == -1 ? null : TimeSpan.FromMilliseconds(ttl) }.AsReadOnly();
         }
 
         await LoadScriptsAsync().AnyContext();
